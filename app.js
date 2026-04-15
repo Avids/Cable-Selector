@@ -6,7 +6,7 @@ const CABLE_DATA = [
   {size:'#14', area:2.08,  cu:15,  al:0   },
   {size:'#12', area:3.31,  cu:20,  al:0   },
   {size:'#10', area:5.26,  cu:30,  al:0   },
-  {size:'#8',  area:8.37,  cu:40,  al:0   },
+  {size:'#8',  area:8.37,  cu:50,  al:0   },
   {size:'#6',  area:13.3,  cu:55,  al:40  },
   {size:'#4',  area:21.1,  cu:70,  al:55  },
   {size:'#2',  area:33.6,  cu:95,  al:75  },
@@ -733,20 +733,26 @@ function runCableCalc() {
   const vd = factor * I * R * L;
   const vd_pct = V > 0 ? (vd / V * 100) : 0;
 
-  // Min size for 3% VD
+  // Min size must satisfy both 3% VD and ampacity.
   const vd_limit = V * 0.03;
-  const needArea = (factor * I * rho * L) / vd_limit;
-  const minRow = CABLE_DATA.find(r => r.area >= needArea) || CABLE_DATA[CABLE_DATA.length-1];
+  const needAreaVD = vd_limit > 0 ? (factor * I * rho * L) / vd_limit : 0;
+  const minRowVD = CABLE_DATA.find(r => r.area >= needAreaVD) || CABLE_DATA[CABLE_DATA.length-1];
 
   const ampacity = mat === 'al' ? row.al : row.cu;
   const ampOk = ampacity > 0 && I <= ampacity;
+  const minRowAmp = CABLE_DATA.find(r => {
+    const cap = mat === 'al' ? r.al : r.cu;
+    return cap > 0 && cap >= I;
+  }) || CABLE_DATA[CABLE_DATA.length-1];
+
+  const minRow = minRowVD.area >= minRowAmp.area ? minRowVD : minRowAmp;
 
   document.getElementById('cv-vd').textContent = vd.toFixed(2) + ' V';
   const vdEl = document.getElementById('cv-vdpct');
   vdEl.textContent = vd_pct.toFixed(2) + '%';
   vdEl.className = 'calc-value ' + (vd_pct > 5 ? 'calc-err' : vd_pct > 3 ? 'calc-warn' : 'calc-ok');
 
-  document.getElementById('cv-minsize').textContent = needArea > 0 ? minRow.size + ' AWG' : '—';
+  document.getElementById('cv-minsize').textContent = I > 0 ? minRow.size + ' AWG' : '—';
   document.getElementById('cv-ampacity').textContent = ampacity > 0 ? ampacity + ' A' : 'N/A (Al <#6)';
 
   const statEl = document.getElementById('cv-status');
