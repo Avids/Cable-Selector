@@ -38,7 +38,7 @@ const COMP_DEFS = {
   cable:       { w:90,  h:60,  label:'Cable',        color:'#a6e3a1', titleColor:'#a6e3a1',
                  defaults:{name:'CAB-1', conductors:3, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120} },
   load:        { w:60,  h:80,  label:'Load',         color:'#f38ba8', titleColor:'#f38ba8',
-                 defaults:{name:'LOAD-1', kw:5, hp:0, pf:0.85, voltage:120, amps:0, desc:'Motor'} },
+                 defaults:{name:'LOAD-1', desc:'Motor', amps:20, voltage:120, phases:1} },
   meter:       { w:70,  h:70,  label:'Meter',        color:'#b4befe', titleColor:'#b4befe',
                  defaults:{name:'MTR-1', type:'kWh', ct_ratio:'200:5', voltage:120} },
 };
@@ -60,7 +60,7 @@ const FIELD_DEFS = {
   {k:'amps',l:'Load Amps (A)',t:'number'},
   {k:'voltage',l:'Voltage (V)',t:'number'}
 ],
-  load:        [{k:'name',l:'Tag'},{k:'desc',l:'Description'},{k:'kw',l:'Power (kW)',t:'number'},{k:'hp',l:'HP',t:'number'},{k:'pf',l:'Power Factor',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'amps',l:'FLA (A)',t:'number'}],
+  load:        [{k:'name',l:'Tag'},{k:'desc',l:'Description'},{k:'amps',l:'Current (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'phases',l:'Phases',t:'number'}],
   meter:       [{k:'name',l:'Tag'},{k:'type',l:'Type'},{k:'ct_ratio',l:'CT Ratio'},{k:'voltage',l:'Voltage (V)',t:'number'}],
 };
 
@@ -631,8 +631,15 @@ function updateProp(input) {
   const key = input.dataset.key;
   const n = nodes.find(n => n.id === nid);
   if (!n) return;
-  const numKeys = ['voltage','phases','amps','kva','primary_v','secondary_v','impedance','main_amps','short_ckt_kA','kaic','poles','fault_kA','kw','hp','pf','length','conductors'];
+  const numKeys = ['voltage','phases','amps','kva','primary_v','secondary_v','impedance','main_amps','short_ckt_kA','kaic','poles','fault_kA','length','conductors'];
   n.props[key] = numKeys.includes(key) ? parseFloat(input.value) || 0 : input.value;
+
+  if (n.type === 'load' && key === 'voltage') {
+    if (n.props.voltage === 120) n.props.phases = 1;
+    if (n.props.voltage === 208) n.props.phases = 3;
+    if (selected === n) showNodeProps(n);
+  }
+
   draw();
   if (n.type === 'cable') runCableCalc();
 }
