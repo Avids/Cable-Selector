@@ -832,6 +832,133 @@ function runCableCalc() {
   }
 }
 
+function calculateLoadCurrent(loadNode) {
+  const p = loadNode.props || {};
+  const directAmps = parseFloat(p.amps) || 0;
+  if (directAmps > 0) return directAmps;
+
+  const kw = parseFloat(p.kw) || 0;
+  const voltage = parseFloat(p.voltage) || 0;
+  const pf = Math.max(0.1, parseFloat(p.pf) || 0.85);
+  if (kw > 0 && voltage > 0) {
+    return (kw * 1000) / (voltage * pf);
+  }
+
+  return 0;
+}
+
+function buildAdjacency() {
+  const graph = new Map();
+  for (const n of nodes) graph.set(n.id, []);
+  for (const w of wires) {
+    if (!graph.has(w.fromNode) || !graph.has(w.toNode)) continue;
+    graph.get(w.fromNode).push(w.toNode);
+    graph.get(w.toNode).push(w.fromNode);
+  }
+  return graph;
+}
+
+function findPath(startId, targetTypes, graph) {
+  const queue = [[startId]];
+  const seen = new Set([startId]);
+  while (queue.length) {
+    const path = queue.shift();
+    const id = path[path.length - 1];
+    const n = nodes.find(node => node.id === id);
+    if (n && targetTypes.includes(n.type) && id !== startId) return path;
+    for (const nextId of graph.get(id) || []) {
+      if (seen.has(nextId)) continue;
+      seen.add(nextId);
+      queue.push([...path, nextId]);
+    }
+  }
+  return null;
+}
+
+function reviewCoordination() {
+  const loads = nodes.filter(n => n.type === 'load');
+  if (loads.length === 0) {
+    document.getElementById('review-content').innerHTML =
+      '<div class="props-empty" style="text-align:center;padding:32px">No loads found.<br>Add load components and connections to review path coordination.</div>';
+    document.getElementById('review-modal').classList.add('open');
+    return;
+  }
+
+  const graph = buildAdjacency();
+  let html = '';
+  for (const load of loads) {
+    const loadName = load.props?.name || `LOAD-${load.id}`;
+    const loadAmps = calculateLoadCurrent(load);
+    const path = findPath(load.id, ['utility', 'transformer', 'panel', 'bus'], graph);
+    const messages = [];
+
+    if (!path) {
+      messages.push('<li class="review-err">✕ Load is not connected to any source/panel path.</li>');
+    } else {
+      const pathNodes = path.map(id => nodes.find(n => n.id === id)).filter(Boolean);
+      const pathText = pathNodes.map(n => n.props?.name || COMP_DEFS[n.type].label).join(' → ');
+      messages.push(`<li class="review-ok">Path found: ${pathText}</li>`);
+
+      const cablesOnPath = pathNodes.filter(n => n.type === 'cable');
+      if (cablesOnPath.length === 0) {
+        messages.push('<li class="review-warn">△ No cable component on this path to verify conductor sizing.</li>');
+      } else {
+        for (const cable of cablesOnPath) {
+          const cp = cable.props || {};
+          const row = getCableRow(cp.size);
+          const mat = (cp.material || 'Cu').toLowerCase().startsWith('al') ? 'al' : 'cu';
+          const ampacity = mat === 'al' ? row.al : row.cu;
+          const cableLoad = Math.max(parseFloat(cp.amps) || 0, loadAmps);
+          if (ampacity <= 0) {
+            messages.push(`<li class="review-err">✕ ${cp.name || 'Cable'}: size ${cp.size} ${mat.toUpperCase()} has no valid ampacity in table.</li>`);
+          } else if (cableLoad > ampacity) {
+            messages.push(`<li class="review-err">✕ ${cp.name || 'Cable'}: ${cableLoad.toFixed(1)}A load exceeds ${ampacity}A ampacity.</li>`);
+          } else {
+            messages.push(`<li class="review-ok">✓ ${cp.name || 'Cable'}: ${cp.size} ${mat.toUpperCase()} supports ${cableLoad.toFixed(1)}A (ampacity ${ampacity}A).</li>`);
+          }
+        }
+      }
+
+      const protectionOnPath = pathNodes.filter(n => n.type === 'breaker' || n.type === 'fuse');
+      if (protectionOnPath.length === 0) {
+        messages.push('<li class="review-warn">△ No breaker/fuse found on path for protection coordination.</li>');
+      } else {
+        for (const device of protectionOnPath) {
+          const rating = parseFloat(device.props?.amps) || 0;
+          const name = device.props?.name || COMP_DEFS[device.type].label;
+          if (rating <= 0) {
+            messages.push(`<li class="review-err">✕ ${name}: missing amp rating.</li>`);
+            continue;
+          }
+          if (loadAmps > 0 && rating < loadAmps) {
+            messages.push(`<li class="review-err">✕ ${name}: ${rating}A is undersized for ${loadAmps.toFixed(1)}A load.</li>`);
+          } else if (loadAmps > 0 && rating > loadAmps * 2.5) {
+            messages.push(`<li class="review-warn">△ ${name}: ${rating}A appears oversized for ${loadAmps.toFixed(1)}A load.</li>`);
+          } else {
+            messages.push(`<li class="review-ok">✓ ${name}: ${rating}A rating is coordinated with ${loadAmps.toFixed(1)}A load.</li>`);
+          }
+        }
+      }
+    }
+
+    if (loadAmps <= 0) {
+      messages.push('<li class="review-warn">△ Load current is 0A. Enter FLA or valid kW/voltage/PF for stronger checks.</li>');
+    } else {
+      messages.push(`<li class="review-ok">Calculated load current: ${loadAmps.toFixed(1)}A.</li>`);
+    }
+
+    html += `
+      <div class="review-block">
+        <div class="review-title">${loadName}</div>
+        <ul class="review-list">${messages.join('')}</ul>
+      </div>
+    `;
+  }
+
+  document.getElementById('review-content').innerHTML = html;
+  document.getElementById('review-modal').classList.add('open');
+}
+
 // ═══════════════════════════════════════════════════
 // FEEDER SCHEDULE
 // ═══════════════════════════════════════════════════
