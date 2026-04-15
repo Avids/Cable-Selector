@@ -493,7 +493,11 @@ canvas.addEventListener('mouseup', e => {
   isPanning = false;
   canvas.classList.remove('panning');
 
-  if (dragNode) { dragNode = null; return; }
+  if (dragNode) {
+    syncCableVoltages();
+    dragNode = null;
+    return;
+  }
 
   if (mode === 'connect' && connectStart) {
     const near = nearestPort(x, y, connectStart.node);
@@ -512,6 +516,7 @@ canvas.addEventListener('mouseup', e => {
           toNode: near.node.id,
           toPort: near.port.id,
         });
+        syncCableVoltages();
       }
     }
     connectStart = null;
@@ -633,6 +638,7 @@ function updateProp(input) {
   if (!n) return;
   const numKeys = ['voltage','phases','amps','kva','primary_v','secondary_v','impedance','main_amps','short_ckt_kA','kaic','poles','fault_kA','kw','hp','pf','length','conductors'];
   n.props[key] = numKeys.includes(key) ? parseFloat(input.value) || 0 : input.value;
+  if (n.type === 'transformer') syncCableVoltages();
   draw();
   if (n.type === 'cable') runCableCalc();
 }
@@ -697,6 +703,7 @@ function deleteSelected() {
   } else if (wires.includes(selected)) {
     wires = wires.filter(w => w !== selected);
   }
+  syncCableVoltages();
   selected = null;
   showEmptyProps();
   draw();
@@ -705,6 +712,7 @@ function deleteSelected() {
 function clearAll() {
   if (!confirm('Clear the entire diagram?')) return;
   nodes = []; wires = []; selected = null;
+  syncCableVoltages();
   showEmptyProps();
   draw();
 }
@@ -715,6 +723,55 @@ function clearAll() {
 
 function getCableRow(size) {
   return CABLE_DATA.find(r => r.size === size) || CABLE_DATA[1];
+}
+
+function getConnectedNodeIds(startId) {
+  const visited = new Set([startId]);
+  const queue = [startId];
+
+  while (queue.length) {
+    const current = queue.shift();
+    for (const w of wires) {
+      const neighbor =
+        w.fromNode === current ? w.toNode :
+        w.toNode === current ? w.fromNode : null;
+      if (neighbor === null || visited.has(neighbor)) continue;
+      visited.add(neighbor);
+      queue.push(neighbor);
+    }
+  }
+
+  return visited;
+}
+
+function syncCableVoltages() {
+  const cables = nodes.filter(n => n.type === 'cable');
+
+  for (const cable of cables) {
+    const connectedIds = getConnectedNodeIds(cable.id);
+    let bestSource = null;
+
+    for (const nodeId of connectedIds) {
+      if (nodeId === cable.id) continue;
+      const n = nodes.find(node => node.id === nodeId);
+      if (!n) continue;
+      if (n.type !== 'transformer') continue;
+      if (n.y >= cable.y) continue;
+
+      const sourceVoltage = n.props.secondary_v ?? n.props.voltage;
+      const voltage = Number(sourceVoltage);
+      if (!Number.isFinite(voltage) || voltage <= 0) continue;
+
+      const verticalDistance = cable.y - n.y;
+      if (!bestSource || verticalDistance < bestSource.verticalDistance) {
+        bestSource = { voltage, verticalDistance };
+      }
+    }
+
+    if (bestSource) {
+      cable.props.voltage = bestSource.voltage;
+    }
+  }
 }
 
 function runCableCalc() {
@@ -875,6 +932,7 @@ function loadProject(e) {
       pan = d.pan || { x: 0, y: 0 };
       zoom = d.zoom || 1;
       idCounter = d.idCounter || 100;
+      syncCableVoltages();
       document.getElementById('zoom-label').textContent = Math.round(zoom * 100) + '%';
       selected = null;
       showEmptyProps();
