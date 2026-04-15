@@ -478,7 +478,8 @@ canvas.addEventListener('mousedown', e => {
       if (!selectedNodes.has(n) || selectedNodes.size <= 1) {
         selectedNodes = new Set([n]);
       }
-      select(n);
+      const keepMultiSelection = selectedNodes.size > 1 && selectedNodes.has(n);
+      select(n, 'node', keepMultiSelection);
       dragNode = n;
       dragOffset = { x: x - n.x, y: y - n.y };
       dragSelection = {
@@ -644,10 +645,12 @@ function wireHitTest(w, wx, wy) {
 // SELECTION & PROPERTIES
 // ═══════════════════════════════════════════════════
 
-function select(item, type) {
+function select(item, type, keepMultiSelection = false) {
   selected = item;
   if (!type || type === 'node') {
-    selectedNodes = new Set([item]);
+    if (!keepMultiSelection) {
+      selectedNodes = new Set([item]);
+    }
     showNodeProps(item);
   } else {
     selectedNodes = new Set();
