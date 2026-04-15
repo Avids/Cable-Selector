@@ -75,6 +75,7 @@ const FIELD_DEFS = {
 let nodes = [];
 let wires = [];
 let selected = null;
+let selectedNodes = new Set();
 let mode = 'select';
 let idCounter = 1;
 
@@ -88,6 +89,8 @@ let ghostWire = null;
 let dragNode = null;
 let dragOffset = { x: 0, y: 0 };
 let dragType = null;
+let dragSelection = null;
+let selectionBox = null;
 
 let hoverNode = null;
 let hoverPortInfo = null;
@@ -161,6 +164,25 @@ function hitNode(wx, wy) {
   return null;
 }
 
+function makeRect(a, b) {
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    w: Math.abs(a.x - b.x),
+    h: Math.abs(a.y - b.y),
+  };
+}
+
+function nodeIntersectsRect(node, rect) {
+  const d = COMP_DEFS[node.type];
+  return !(
+    node.x + d.w < rect.x ||
+    node.x > rect.x + rect.w ||
+    node.y + d.h < rect.y ||
+    node.y > rect.y + rect.h
+  );
+}
+
 // ═══════════════════════════════════════════════════
 // DRAWING
 // ═══════════════════════════════════════════════════
@@ -198,7 +220,21 @@ function draw() {
 
   // Draw nodes
   for (const n of nodes) {
-    drawNode(n, n === selected, n === hoverNode);
+    const isSelectedNode = selectedNodes.has(n);
+    drawNode(n, isSelectedNode, n === hoverNode);
+  }
+
+  if (selectionBox) {
+    const rect = makeRect(selectionBox.start, selectionBox.current);
+    ctx.save();
+    ctx.fillStyle = 'rgba(137,180,250,0.12)';
+    ctx.strokeStyle = '#89b4fa';
+    ctx.lineWidth = 1 / zoom;
+    ctx.setLineDash([6 / zoom, 4 / zoom]);
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.setLineDash([]);
+    ctx.restore();
   }
 
   // Draw ports in connect mode
@@ -426,6 +462,7 @@ function dropComp(e) {
 // ═══════════════════════════════════════════════════
 
 canvas.addEventListener('mousedown', e => {
+  if (e.button !== 0 && e.button !== 1) return;
   const { x, y } = toWorld(e.clientX, e.clientY);
 
   if (mode === 'pan' || e.button === 1) {
@@ -438,9 +475,17 @@ canvas.addEventListener('mousedown', e => {
   if (mode === 'select') {
     const n = hitNode(x, y);
     if (n) {
-      select(n);
+      if (!selectedNodes.has(n) || selectedNodes.size <= 1) {
+        selectedNodes = new Set([n]);
+      }
+      const keepMultiSelection = selectedNodes.size > 1 && selectedNodes.has(n);
+      select(n, 'node', keepMultiSelection);
       dragNode = n;
       dragOffset = { x: x - n.x, y: y - n.y };
+      dragSelection = {
+        start: { x, y },
+        nodes: Array.from(selectedNodes).map(node => ({ node, x: node.x, y: node.y })),
+      };
     } else {
       // Check wire hit
       let hitWire = null;
@@ -448,9 +493,15 @@ canvas.addEventListener('mousedown', e => {
         if (wireHitTest(w, x, y)) { hitWire = w; break; }
       }
       if (hitWire) {
+        selectedNodes = new Set();
         select(hitWire, 'wire');
       } else {
-        deselect();
+        selectionBox = { start: { x, y }, current: { x, y } };
+        selected = null;
+        selectedNodes = new Set();
+        showEmptyProps();
+        const displayMode = mode === 'connect' ? 'CONNECTOR' : mode.toUpperCase();
+        document.getElementById('status-bar').textContent = 'MODE: ' + displayMode;
       }
     }
     draw();
@@ -475,9 +526,19 @@ canvas.addEventListener('mousemove', e => {
     draw(); return;
   }
 
-  if (mode === 'select' && dragNode) {
-    dragNode.x = Math.round((x - dragOffset.x) / 10) * 10;
-    dragNode.y = Math.round((y - dragOffset.y) / 10) * 10;
+  if (mode === 'select' && selectionBox) {
+    selectionBox.current = { x, y };
+    draw();
+    return;
+  }
+
+  if (mode === 'select' && dragSelection) {
+    const dx = x - dragSelection.start.x;
+    const dy = y - dragSelection.start.y;
+    for (const item of dragSelection.nodes) {
+      item.node.x = Math.round((item.x + dx) / 10) * 10;
+      item.node.y = Math.round((item.y + dy) / 10) * 10;
+    }
     draw(); return;
   }
 
@@ -497,8 +558,28 @@ canvas.addEventListener('mouseup', e => {
   isPanning = false;
   canvas.classList.remove('panning');
 
-  if (dragNode) {
+  if (selectionBox) {
+    selectionBox.current = { x, y };
+    const rect = makeRect(selectionBox.start, selectionBox.current);
+    const matched = nodes.filter(n => nodeIntersectsRect(n, rect));
+    selectedNodes = new Set(matched);
+    if (matched.length === 1) {
+      select(matched[0]);
+    } else if (matched.length > 1) {
+      selected = null;
+      showEmptyProps();
+      document.getElementById('status-bar').textContent = `SELECTED: ${matched.length} ITEMS`;
+    } else {
+      deselect();
+    }
+    selectionBox = null;
+    draw();
+    return;
+  }
+
+  if (dragSelection) {
     syncCableVoltages();
+    dragSelection = null;
     dragNode = null;
     return;
   }
@@ -564,11 +645,15 @@ function wireHitTest(w, wx, wy) {
 // SELECTION & PROPERTIES
 // ═══════════════════════════════════════════════════
 
-function select(item, type) {
+function select(item, type, keepMultiSelection = false) {
   selected = item;
   if (!type || type === 'node') {
+    if (!keepMultiSelection) {
+      selectedNodes = new Set([item]);
+    }
     showNodeProps(item);
   } else {
+    selectedNodes = new Set();
     showWireProps(item);
   }
   document.getElementById('status-bar').textContent =
@@ -577,6 +662,7 @@ function select(item, type) {
 
 function deselect() {
   selected = null;
+  selectedNodes = new Set();
   showEmptyProps();
   // Change 'WIRE' to 'CONNECTOR' here
   const displayMode = mode === 'connect' ? 'CONNECTOR' : mode.toUpperCase();
@@ -664,6 +750,8 @@ function setMode(m) {
   
   connectStart = null;
   ghostWire = null;
+  selectionBox = null;
+  dragSelection = null;
   draw();
 }
 
@@ -700,6 +788,17 @@ function resetView() {
 // ═══════════════════════════════════════════════════
 
 function deleteSelected() {
+  if (selectedNodes.size > 0) {
+    const selectedIds = new Set(Array.from(selectedNodes).map(n => n.id));
+    wires = wires.filter(w => !selectedIds.has(w.fromNode) && !selectedIds.has(w.toNode));
+    nodes = nodes.filter(n => !selectedIds.has(n.id));
+    selectedNodes = new Set();
+    selected = null;
+    syncCableVoltages();
+    showEmptyProps();
+    draw();
+    return;
+  }
   if (!selected) return;
   if (nodes.includes(selected)) {
     wires = wires.filter(w => w.fromNode !== selected.id && w.toNode !== selected.id);
