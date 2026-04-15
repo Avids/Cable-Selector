@@ -1074,6 +1074,7 @@ function showFeederList() {
   let rows = '';
   for (const c of cables) {
     const p = c.props;
+    const { from, to } = getCableEndpoints(c);
     const V = p.voltage || 120;
     const I = p.amps || 0;
     const L = p.length || 1;
@@ -1094,6 +1095,8 @@ function showFeederList() {
     const ampText = ampOk ? 'OK' : 'OVER';
     rows += `<tr>
       <td style="color:#cdd6f4;font-weight:500">${p.name||'—'}</td>
+      <td>${from}</td>
+      <td>${to}</td>
       <td>${p.conductors||1}C-${p.size} ${mat.toUpperCase()}</td>
       <td>${p.insulation||'—'}</td>
       <td>${L} m</td>
@@ -1107,7 +1110,7 @@ function showFeederList() {
   document.getElementById('feeder-content').innerHTML = `
     <table class="feeder-table">
       <thead><tr>
-        <th>Tag</th><th>Conductor</th><th>Insulation</th>
+        <th>Tag</th><th>From</th><th>To</th><th>Conductor</th><th>Insulation</th>
         <th>Length</th><th>Voltage / Phase</th><th>Load</th>
         <th>Ampacity</th><th>Voltage Drop</th>
       </tr></thead>
@@ -1118,9 +1121,10 @@ function showFeederList() {
 
 function exportCSV() {
   const cables = nodes.filter(n => n.type === 'cable');
-  let csv = 'Tag,Conductors,Size,Material,Insulation,Length(m),Voltage(V),Phases,Load(A),Ampacity(A),VD(V),VD(%),Status\n';
+  let csv = 'Tag,From,To,Conductors,Size,Material,Insulation,Length(m),Voltage(V),Phases,Load(A),Ampacity(A),VD(V),VD(%),Status\n';
   for (const c of cables) {
     const p = c.props;
+    const { from, to } = getCableEndpoints(c);
     const V = p.voltage || 120;
     const I = p.amps || 0;
     const L = p.length || 1;
@@ -1136,12 +1140,31 @@ function exportCSV() {
     const ampacity = mat === 'al' ? row.al : row.cu;
     const ampOk = ampacity <= 0 || I <= ampacity;
     const status = !ampOk ? 'OVERLOAD' : vd_pct > 5 ? 'VD_FAIL' : vd_pct > 3 ? 'VD_CHECK' : 'PASS';
-    csv += `${p.name||''},${p.conductors||1},${p.size},${mat.toUpperCase()},${p.insulation||''},${L},${V},${phases},${I},${ampacity>0?ampacity:'N/A'},${vd.toFixed(3)},${vd_pct.toFixed(2)},${status}\n`;
+    csv += `${p.name||''},${from},${to},${p.conductors||1},${p.size},${mat.toUpperCase()},${p.insulation||''},${L},${V},${phases},${I},${ampacity>0?ampacity:'N/A'},${vd.toFixed(3)},${vd_pct.toFixed(2)},${status}\n`;
   }
   const a = document.createElement('a');
   a.href = 'data:text/csv,' + encodeURIComponent(csv);
   a.download = 'feeder_schedule_CSA.csv';
   a.click();
+}
+
+function getCableEndpoints(cableNode) {
+  const connectedNodes = [];
+  for (const wire of wires) {
+    if (wire.fromNode === cableNode.id) {
+      const target = nodes.find(n => n.id === wire.toNode);
+      if (target) connectedNodes.push(target);
+    } else if (wire.toNode === cableNode.id) {
+      const source = nodes.find(n => n.id === wire.fromNode);
+      if (source) connectedNodes.push(source);
+    }
+  }
+
+  const uniqueNames = [...new Set(connectedNodes.map(n => (n.props?.name || COMP_DEFS[n.type].label || '—')))];
+  return {
+    from: uniqueNames[0] || '—',
+    to: uniqueNames[1] || '—',
+  };
 }
 
 // ═══════════════════════════════════════════════════
