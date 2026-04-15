@@ -22,11 +22,14 @@ const CABLE_DATA = [
   {size:'500', area:253.0, cu:320, al:260 },
 ];
 
+const TRANSFORMER_VOLTAGE_OPTIONS = [600, 480, 208];
+const TRANSFORMER_KVA_OPTIONS = [3, 6, 9, 15, 30, 45, 75, 100, 112.5, 150, 225, 300, 450, 500, 600];
+
 const COMP_DEFS = {
   utility:     { w:80,  h:80,  label:'Utility',      color:'#89b4fa', titleColor:'#89b4fa',
                  defaults:{name:'UTIL-1', voltage:600, phases:3, fault_kA:25} },
   transformer: { w:80,  h:90,  label:'Transformer',  color:'#cba6f7', titleColor:'#cba6f7',
-                 defaults:{name:'TX-1', kva:75, primary_v:600, secondary_v:120, phases:3, impedance:4.5, conn:'Delta-Wye'} },
+                 defaults:{name:'TX-1', kva:75, primary_v:600, secondary_v:208, phases:3, impedance:4.5, conn:'Delta-Wye'} },
   panel:       { w:90,  h:80,  label:'Panel',        color:'#94e2d5', titleColor:'#94e2d5',
                  defaults:{name:'MDP', voltage:120, phases:3, main_amps:200, short_ckt_kA:10, mfr:'Square D'} },
   breaker:     { w:60,  h:80,  label:'Breaker',      color:'#74c7ec', titleColor:'#74c7ec',
@@ -45,7 +48,7 @@ const COMP_DEFS = {
 
 const FIELD_DEFS = {
   utility:     [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'phases',l:'Phases',t:'number'},{k:'fault_kA',l:'Fault (kA)',t:'number'}],
-  transformer: [{k:'name',l:'Tag'},{k:'kva',l:'KVA',t:'number'},{k:'primary_v',l:'Primary V',t:'number'},{k:'secondary_v',l:'Secondary V',t:'number'},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
+  transformer: [{k:'name',l:'Tag'},{k:'kva',l:'KVA',t:'select',options:TRANSFORMER_KVA_OPTIONS},{k:'primary_v',l:'Primary V',t:'select',options:TRANSFORMER_VOLTAGE_OPTIONS},{k:'secondary_v',l:'Secondary V',t:'select',options:TRANSFORMER_VOLTAGE_OPTIONS},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
   panel:       [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'phases',l:'Phases',t:'number'},{k:'main_amps',l:'Main Amps',t:'number'},{k:'short_ckt_kA',l:'SCCR (kA)',t:'number'},{k:'mfr',l:'Manufacturer'}],
   breaker:     [{k:'name',l:'Tag'},{k:'amps',l:'Trip (A)',t:'number'},{k:'poles',l:'Poles',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'kaic',l:'kAIC',t:'number'},{k:'type',l:'Trip Type'},{k:'mfr',l:'Manufacturer'}],
   fuse:        [{k:'name',l:'Tag'},{k:'amps',l:'Rating (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'fuse_class',l:'Fuse Class'},{k:'poles',l:'Poles',t:'number'}],
