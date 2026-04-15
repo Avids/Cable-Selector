@@ -43,6 +43,7 @@
   <button class="tb-btn" onclick="document.getElementById('file-input').click()">↑ Load</button>
   <input type="file" id="file-input" accept=".json" style="display:none" onchange="loadProject(event)">
   <div class="sep"></div>
+  <button class="tb-btn review" onclick="reviewCoordination()">✓ Review Coordination</button>
   <button class="tb-btn success" onclick="showFeederList()">≡ Feeder Schedule</button>
   <div id="status-bar">MODE: SELECT</div>
 </div>
@@ -212,6 +213,21 @@
     <div class="modal-actions">
       <button class="tb-btn" onclick="exportCSV()">↓ Export CSV</button>
       <button class="tb-btn" onclick="document.getElementById('feeder-modal').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- COORDINATION REVIEW MODAL -->
+<div class="modal-overlay" id="review-modal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title">
+      Path Coordination Review
+      <span class="modal-close" onclick="document.getElementById('review-modal').classList.remove('open')">✕</span>
+    </div>
+    <div class="modal-subtitle">Checks each load path for conductor sizing, breaker/fuse sizing, and basic data completeness.</div>
+    <div id="review-content"></div>
+    <div class="modal-actions">
+      <button class="tb-btn" onclick="document.getElementById('review-modal').classList.remove('open')">Close</button>
     </div>
   </div>
 </div>

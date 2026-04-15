@@ -74,6 +74,8 @@
   .tb-btn.danger:hover { border-color: var(--red); color: var(--red); }
   .tb-btn.success { border-color: var(--green); color: var(--green); }
   .tb-btn.success:hover { background: rgba(166,227,161,0.1); }
+  .tb-btn.review { border-color: var(--accent2); color: var(--accent2); }
+  .tb-btn.review:hover { background: rgba(116,199,236,0.1); }
   #status-bar { margin-left: auto; font-size: 11px; font-family: var(--mono); color: var(--text3); }
 
   /* WORKSPACE */
@@ -345,6 +347,29 @@
   .badge-ok { background: rgba(166,227,161,0.15); color: var(--green); border: 1px solid rgba(166,227,161,0.3); }
   .badge-warn { background: rgba(249,226,175,0.15); color: var(--yellow); border: 1px solid rgba(249,226,175,0.3); }
   .badge-err { background: rgba(243,139,168,0.15); color: var(--red); border: 1px solid rgba(243,139,168,0.3); }
+  .review-block {
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+  }
+  .review-title {
+    font-family: var(--mono);
+    color: var(--text);
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .review-list {
+    margin-left: 16px;
+    color: var(--text2);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .review-list li { margin-bottom: 2px; }
+  .review-ok { color: var(--green); }
+  .review-warn { color: var(--yellow); }
+  .review-err { color: var(--red); }
 
   /* KEYBOARD HINT */
   #kbd-hints {
