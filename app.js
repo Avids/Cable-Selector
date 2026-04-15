@@ -42,7 +42,7 @@ const COMP_DEFS = {
   cable:       { w:90,  h:60,  label:'Cable',        color:'#a6e3a1', titleColor:'#a6e3a1',
                  defaults:{name:'CAB-1', conductors:3, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120} },
   load:        { w:60,  h:80,  label:'Load',         color:'#f38ba8', titleColor:'#f38ba8',
-                 defaults:{name:'LOAD-1', kw:5, hp:0, pf:0.85, voltage:120, amps:0, desc:'Motor'} },
+                 defaults:{name:'LOAD-1', current:20, voltage:120, phases:1} },
   meter:       { w:70,  h:70,  label:'Meter',        color:'#b4befe', titleColor:'#b4befe',
                  defaults:{name:'MTR-1', type:'kWh', ct_ratio:'200:5', voltage:120} },
 };
@@ -64,7 +64,7 @@ const FIELD_DEFS = {
   {k:'amps',l:'Load Amps (A)',t:'number'},
   {k:'voltage',l:'Voltage (V)',t:'number'}
 ],
-  load:        [{k:'name',l:'Tag'},{k:'desc',l:'Description'},{k:'kw',l:'Power (kW)',t:'number'},{k:'hp',l:'HP',t:'number'},{k:'pf',l:'Power Factor',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'amps',l:'FLA (A)',t:'number'}],
+  load:        [{k:'name',l:'Tag'},{k:'current',l:'Current (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'phases',l:'Phases',t:'select',options:[1,3]}],
   meter:       [{k:'name',l:'Tag'},{k:'type',l:'Type'},{k:'ct_ratio',l:'CT Ratio'},{k:'voltage',l:'Voltage (V)',t:'number'}],
 };
 
@@ -726,7 +726,7 @@ function updateProp(input) {
   const key = input.dataset.key;
   const n = nodes.find(n => n.id === nid);
   if (!n) return;
-  const numKeys = ['voltage','phases','amps','kva','primary_v','secondary_v','impedance','main_amps','short_ckt_kA','kaic','poles','fault_kA','kw','hp','pf','length','conductors'];
+  const numKeys = ['voltage','phases','amps','current','kva','primary_v','secondary_v','impedance','main_amps','short_ckt_kA','kaic','poles','fault_kA','kw','hp','pf','length','conductors'];
   n.props[key] = numKeys.includes(key) ? parseFloat(input.value) || 0 : input.value;
   if (n.type === 'transformer') syncCableVoltages();
   draw();
@@ -933,15 +933,12 @@ function runCableCalc() {
 
 function calculateLoadCurrent(loadNode) {
   const p = loadNode.props || {};
-  const directAmps = parseFloat(p.amps) || 0;
-  if (directAmps > 0) return directAmps;
+  const current = parseFloat(p.current) || 0;
+  if (current > 0) return current;
 
-  const kw = parseFloat(p.kw) || 0;
-  const voltage = parseFloat(p.voltage) || 0;
-  const pf = Math.max(0.1, parseFloat(p.pf) || 0.85);
-  if (kw > 0 && voltage > 0) {
-    return (kw * 1000) / (voltage * pf);
-  }
+  // Backward compatibility with older saved projects.
+  const legacyAmps = parseFloat(p.amps) || 0;
+  if (legacyAmps > 0) return legacyAmps;
 
   return 0;
 }
