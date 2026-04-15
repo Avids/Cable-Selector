@@ -6,7 +6,7 @@ const CABLE_DATA = [
   {size:'#14', area:2.08,  cu:15,  al:0   },
   {size:'#12', area:3.31,  cu:20,  al:0   },
   {size:'#10', area:5.26,  cu:30,  al:0   },
-  {size:'#8',  area:8.37,  cu:40,  al:0   },
+  {size:'#8',  area:8.37,  cu:50,  al:0   },
   {size:'#6',  area:13.3,  cu:55,  al:40  },
   {size:'#4',  area:21.1,  cu:70,  al:55  },
   {size:'#2',  area:33.6,  cu:95,  al:75  },
@@ -22,11 +22,15 @@ const CABLE_DATA = [
   {size:'500', area:253.0, cu:320, al:260 },
 ];
 
+const TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS = [600, 480, 208];
+const TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS = [480, 208];
+const TRANSFORMER_KVA_OPTIONS = [3, 6, 9, 15, 30, 45, 75, 100, 112.5, 150, 225, 300, 450, 500, 600];
+
 const COMP_DEFS = {
   utility:     { w:80,  h:80,  label:'Utility',      color:'#89b4fa', titleColor:'#89b4fa',
                  defaults:{name:'UTIL-1', voltage:600, phases:3, fault_kA:25} },
   transformer: { w:80,  h:90,  label:'Transformer',  color:'#cba6f7', titleColor:'#cba6f7',
-                 defaults:{name:'TX-1', kva:75, primary_v:600, secondary_v:120, phases:3, impedance:4.5, conn:'Delta-Wye'} },
+                 defaults:{name:'TX-1', kva:75, primary_v:600, secondary_v:208, phases:3, impedance:4.5, conn:'Delta-Wye'} },
   panel:       { w:90,  h:80,  label:'Panel',        color:'#94e2d5', titleColor:'#94e2d5',
                  defaults:{name:'MDP', voltage:120, phases:3, main_amps:200, short_ckt_kA:10, mfr:'Square D'} },
   breaker:     { w:60,  h:80,  label:'Breaker',      color:'#74c7ec', titleColor:'#74c7ec',
@@ -45,7 +49,7 @@ const COMP_DEFS = {
 
 const FIELD_DEFS = {
   utility:     [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'phases',l:'Phases',t:'number'},{k:'fault_kA',l:'Fault (kA)',t:'number'}],
-  transformer: [{k:'name',l:'Tag'},{k:'kva',l:'KVA',t:'number'},{k:'primary_v',l:'Primary V',t:'number'},{k:'secondary_v',l:'Secondary V',t:'number'},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
+  transformer: [{k:'name',l:'Tag'},{k:'kva',l:'KVA',t:'select',options:TRANSFORMER_KVA_OPTIONS},{k:'primary_v',l:'Primary V',t:'select',options:TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS},{k:'secondary_v',l:'Secondary V',t:'select',options:TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
   panel:       [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'phases',l:'Phases',t:'number'},{k:'main_amps',l:'Main Amps',t:'number'},{k:'short_ckt_kA',l:'SCCR (kA)',t:'number'},{k:'mfr',l:'Manufacturer'}],
   breaker:     [{k:'name',l:'Tag'},{k:'amps',l:'Trip (A)',t:'number'},{k:'poles',l:'Poles',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'kaic',l:'kAIC',t:'number'},{k:'type',l:'Trip Type'},{k:'mfr',l:'Manufacturer'}],
   fuse:        [{k:'name',l:'Tag'},{k:'amps',l:'Rating (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'fuse_class',l:'Fuse Class'},{k:'poles',l:'Poles',t:'number'}],
@@ -493,7 +497,11 @@ canvas.addEventListener('mouseup', e => {
   isPanning = false;
   canvas.classList.remove('panning');
 
-  if (dragNode) { dragNode = null; return; }
+  if (dragNode) {
+    syncCableVoltages();
+    dragNode = null;
+    return;
+  }
 
   if (mode === 'connect' && connectStart) {
     const near = nearestPort(x, y, connectStart.node);
@@ -512,6 +520,7 @@ canvas.addEventListener('mouseup', e => {
           toNode: near.node.id,
           toPort: near.port.id,
         });
+        syncCableVoltages();
       }
     }
     connectStart = null;
@@ -704,6 +713,7 @@ function deleteSelected() {
   } else if (wires.includes(selected)) {
     wires = wires.filter(w => w !== selected);
   }
+  syncCableVoltages();
   selected = null;
   showEmptyProps();
   draw();
@@ -712,6 +722,7 @@ function deleteSelected() {
 function clearAll() {
   if (!confirm('Clear the entire diagram?')) return;
   nodes = []; wires = []; selected = null;
+  syncCableVoltages();
   showEmptyProps();
   draw();
 }
@@ -722,6 +733,55 @@ function clearAll() {
 
 function getCableRow(size) {
   return CABLE_DATA.find(r => r.size === size) || CABLE_DATA[1];
+}
+
+function getConnectedNodeIds(startId) {
+  const visited = new Set([startId]);
+  const queue = [startId];
+
+  while (queue.length) {
+    const current = queue.shift();
+    for (const w of wires) {
+      const neighbor =
+        w.fromNode === current ? w.toNode :
+        w.toNode === current ? w.fromNode : null;
+      if (neighbor === null || visited.has(neighbor)) continue;
+      visited.add(neighbor);
+      queue.push(neighbor);
+    }
+  }
+
+  return visited;
+}
+
+function syncCableVoltages() {
+  const cables = nodes.filter(n => n.type === 'cable');
+
+  for (const cable of cables) {
+    const connectedIds = getConnectedNodeIds(cable.id);
+    let bestSource = null;
+
+    for (const nodeId of connectedIds) {
+      if (nodeId === cable.id) continue;
+      const n = nodes.find(node => node.id === nodeId);
+      if (!n) continue;
+      if (n.type !== 'transformer') continue;
+      if (n.y >= cable.y) continue;
+
+      const sourceVoltage = n.props.secondary_v ?? n.props.voltage;
+      const voltage = Number(sourceVoltage);
+      if (!Number.isFinite(voltage) || voltage <= 0) continue;
+
+      const verticalDistance = cable.y - n.y;
+      if (!bestSource || verticalDistance < bestSource.verticalDistance) {
+        bestSource = { voltage, verticalDistance };
+      }
+    }
+
+    if (bestSource) {
+      cable.props.voltage = bestSource.voltage;
+    }
+  }
 }
 
 function runCableCalc() {
@@ -740,20 +800,26 @@ function runCableCalc() {
   const vd = factor * I * R * L;
   const vd_pct = V > 0 ? (vd / V * 100) : 0;
 
-  // Min size for 3% VD
+  // Min size must satisfy both 3% VD and ampacity.
   const vd_limit = V * 0.03;
-  const needArea = (factor * I * rho * L) / vd_limit;
-  const minRow = CABLE_DATA.find(r => r.area >= needArea) || CABLE_DATA[CABLE_DATA.length-1];
+  const needAreaVD = vd_limit > 0 ? (factor * I * rho * L) / vd_limit : 0;
+  const minRowVD = CABLE_DATA.find(r => r.area >= needAreaVD) || CABLE_DATA[CABLE_DATA.length-1];
 
   const ampacity = mat === 'al' ? row.al : row.cu;
   const ampOk = ampacity > 0 && I <= ampacity;
+  const minRowAmp = CABLE_DATA.find(r => {
+    const cap = mat === 'al' ? r.al : r.cu;
+    return cap > 0 && cap >= I;
+  }) || CABLE_DATA[CABLE_DATA.length-1];
+
+  const minRow = minRowVD.area >= minRowAmp.area ? minRowVD : minRowAmp;
 
   document.getElementById('cv-vd').textContent = vd.toFixed(2) + ' V';
   const vdEl = document.getElementById('cv-vdpct');
   vdEl.textContent = vd_pct.toFixed(2) + '%';
   vdEl.className = 'calc-value ' + (vd_pct > 5 ? 'calc-err' : vd_pct > 3 ? 'calc-warn' : 'calc-ok');
 
-  document.getElementById('cv-minsize').textContent = needArea > 0 ? minRow.size + ' AWG' : '—';
+  document.getElementById('cv-minsize').textContent = I > 0 ? minRow.size + ' AWG' : '—';
   document.getElementById('cv-ampacity').textContent = ampacity > 0 ? ampacity + ' A' : 'N/A (Al <#6)';
 
   const statEl = document.getElementById('cv-status');
@@ -770,6 +836,133 @@ function runCableCalc() {
     statEl.textContent = '✓ PASS';
     statEl.className = 'calc-value calc-ok';
   }
+}
+
+function calculateLoadCurrent(loadNode) {
+  const p = loadNode.props || {};
+  const directAmps = parseFloat(p.amps) || 0;
+  if (directAmps > 0) return directAmps;
+
+  const kw = parseFloat(p.kw) || 0;
+  const voltage = parseFloat(p.voltage) || 0;
+  const pf = Math.max(0.1, parseFloat(p.pf) || 0.85);
+  if (kw > 0 && voltage > 0) {
+    return (kw * 1000) / (voltage * pf);
+  }
+
+  return 0;
+}
+
+function buildAdjacency() {
+  const graph = new Map();
+  for (const n of nodes) graph.set(n.id, []);
+  for (const w of wires) {
+    if (!graph.has(w.fromNode) || !graph.has(w.toNode)) continue;
+    graph.get(w.fromNode).push(w.toNode);
+    graph.get(w.toNode).push(w.fromNode);
+  }
+  return graph;
+}
+
+function findPath(startId, targetTypes, graph) {
+  const queue = [[startId]];
+  const seen = new Set([startId]);
+  while (queue.length) {
+    const path = queue.shift();
+    const id = path[path.length - 1];
+    const n = nodes.find(node => node.id === id);
+    if (n && targetTypes.includes(n.type) && id !== startId) return path;
+    for (const nextId of graph.get(id) || []) {
+      if (seen.has(nextId)) continue;
+      seen.add(nextId);
+      queue.push([...path, nextId]);
+    }
+  }
+  return null;
+}
+
+function reviewCoordination() {
+  const loads = nodes.filter(n => n.type === 'load');
+  if (loads.length === 0) {
+    document.getElementById('review-content').innerHTML =
+      '<div class="props-empty" style="text-align:center;padding:32px">No loads found.<br>Add load components and connections to review path coordination.</div>';
+    document.getElementById('review-modal').classList.add('open');
+    return;
+  }
+
+  const graph = buildAdjacency();
+  let html = '';
+  for (const load of loads) {
+    const loadName = load.props?.name || `LOAD-${load.id}`;
+    const loadAmps = calculateLoadCurrent(load);
+    const path = findPath(load.id, ['utility', 'transformer', 'panel', 'bus'], graph);
+    const messages = [];
+
+    if (!path) {
+      messages.push('<li class="review-err">✕ Load is not connected to any source/panel path.</li>');
+    } else {
+      const pathNodes = path.map(id => nodes.find(n => n.id === id)).filter(Boolean);
+      const pathText = pathNodes.map(n => n.props?.name || COMP_DEFS[n.type].label).join(' → ');
+      messages.push(`<li class="review-ok">Path found: ${pathText}</li>`);
+
+      const cablesOnPath = pathNodes.filter(n => n.type === 'cable');
+      if (cablesOnPath.length === 0) {
+        messages.push('<li class="review-warn">△ No cable component on this path to verify conductor sizing.</li>');
+      } else {
+        for (const cable of cablesOnPath) {
+          const cp = cable.props || {};
+          const row = getCableRow(cp.size);
+          const mat = (cp.material || 'Cu').toLowerCase().startsWith('al') ? 'al' : 'cu';
+          const ampacity = mat === 'al' ? row.al : row.cu;
+          const cableLoad = Math.max(parseFloat(cp.amps) || 0, loadAmps);
+          if (ampacity <= 0) {
+            messages.push(`<li class="review-err">✕ ${cp.name || 'Cable'}: size ${cp.size} ${mat.toUpperCase()} has no valid ampacity in table.</li>`);
+          } else if (cableLoad > ampacity) {
+            messages.push(`<li class="review-err">✕ ${cp.name || 'Cable'}: ${cableLoad.toFixed(1)}A load exceeds ${ampacity}A ampacity.</li>`);
+          } else {
+            messages.push(`<li class="review-ok">✓ ${cp.name || 'Cable'}: ${cp.size} ${mat.toUpperCase()} supports ${cableLoad.toFixed(1)}A (ampacity ${ampacity}A).</li>`);
+          }
+        }
+      }
+
+      const protectionOnPath = pathNodes.filter(n => n.type === 'breaker' || n.type === 'fuse');
+      if (protectionOnPath.length === 0) {
+        messages.push('<li class="review-warn">△ No breaker/fuse found on path for protection coordination.</li>');
+      } else {
+        for (const device of protectionOnPath) {
+          const rating = parseFloat(device.props?.amps) || 0;
+          const name = device.props?.name || COMP_DEFS[device.type].label;
+          if (rating <= 0) {
+            messages.push(`<li class="review-err">✕ ${name}: missing amp rating.</li>`);
+            continue;
+          }
+          if (loadAmps > 0 && rating < loadAmps) {
+            messages.push(`<li class="review-err">✕ ${name}: ${rating}A is undersized for ${loadAmps.toFixed(1)}A load.</li>`);
+          } else if (loadAmps > 0 && rating > loadAmps * 2.5) {
+            messages.push(`<li class="review-warn">△ ${name}: ${rating}A appears oversized for ${loadAmps.toFixed(1)}A load.</li>`);
+          } else {
+            messages.push(`<li class="review-ok">✓ ${name}: ${rating}A rating is coordinated with ${loadAmps.toFixed(1)}A load.</li>`);
+          }
+        }
+      }
+    }
+
+    if (loadAmps <= 0) {
+      messages.push('<li class="review-warn">△ Load current is 0A. Enter FLA or valid kW/voltage/PF for stronger checks.</li>');
+    } else {
+      messages.push(`<li class="review-ok">Calculated load current: ${loadAmps.toFixed(1)}A.</li>`);
+    }
+
+    html += `
+      <div class="review-block">
+        <div class="review-title">${loadName}</div>
+        <ul class="review-list">${messages.join('')}</ul>
+      </div>
+    `;
+  }
+
+  document.getElementById('review-content').innerHTML = html;
+  document.getElementById('review-modal').classList.add('open');
 }
 
 // ═══════════════════════════════════════════════════
@@ -882,6 +1075,7 @@ function loadProject(e) {
       pan = d.pan || { x: 0, y: 0 };
       zoom = d.zoom || 1;
       idCounter = d.idCounter || 100;
+      syncCableVoltages();
       document.getElementById('zoom-label').textContent = Math.round(zoom * 100) + '%';
       selected = null;
       showEmptyProps();
