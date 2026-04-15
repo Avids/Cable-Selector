@@ -22,7 +22,8 @@ const CABLE_DATA = [
   {size:'500', area:253.0, cu:320, al:260 },
 ];
 
-const TRANSFORMER_VOLTAGE_OPTIONS = [600, 480, 208];
+const TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS = [600, 480, 208];
+const TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS = [480, 208];
 const TRANSFORMER_KVA_OPTIONS = [3, 6, 9, 15, 30, 45, 75, 100, 112.5, 150, 225, 300, 450, 500, 600];
 
 const COMP_DEFS = {
@@ -48,7 +49,7 @@ const COMP_DEFS = {
 
 const FIELD_DEFS = {
   utility:     [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'phases',l:'Phases',t:'number'},{k:'fault_kA',l:'Fault (kA)',t:'number'}],
-  transformer: [{k:'name',l:'Tag'},{k:'kva',l:'KVA',t:'select',options:TRANSFORMER_KVA_OPTIONS},{k:'primary_v',l:'Primary V',t:'select',options:TRANSFORMER_VOLTAGE_OPTIONS},{k:'secondary_v',l:'Secondary V',t:'select',options:TRANSFORMER_VOLTAGE_OPTIONS},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
+  transformer: [{k:'name',l:'Tag'},{k:'kva',l:'KVA',t:'select',options:TRANSFORMER_KVA_OPTIONS},{k:'primary_v',l:'Primary V',t:'select',options:TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS},{k:'secondary_v',l:'Secondary V',t:'select',options:TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
   panel:       [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'phases',l:'Phases',t:'number'},{k:'main_amps',l:'Main Amps',t:'number'},{k:'short_ckt_kA',l:'SCCR (kA)',t:'number'},{k:'mfr',l:'Manufacturer'}],
   breaker:     [{k:'name',l:'Tag'},{k:'amps',l:'Trip (A)',t:'number'},{k:'poles',l:'Poles',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'kaic',l:'kAIC',t:'number'},{k:'type',l:'Trip Type'},{k:'mfr',l:'Manufacturer'}],
   fuse:        [{k:'name',l:'Tag'},{k:'amps',l:'Rating (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'fuse_class',l:'Fuse Class'},{k:'poles',l:'Poles',t:'number'}],
