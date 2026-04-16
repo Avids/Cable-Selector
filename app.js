@@ -95,6 +95,7 @@ let selectionBox = null;
 let hoverNode = null;
 let hoverPortInfo = null;
 let canvasStyle = 'engineering';
+// NOTE: keep wireRouting from main; do not reintroduce suppressCanvasBackdrop.
 let wireRouting = 'orthogonal';
 
 const canvas = document.getElementById('canvas');
