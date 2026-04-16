@@ -98,11 +98,8 @@ let selectionBox = null;
 let hoverNode = null;
 let hoverPortInfo = null;
 let canvasStyle = 'engineering';
-<<<<<<< codex/add-canvas-printing-feature
 let suppressCanvasBackdrop = false;
-=======
 let wireRouting = 'orthogonal';
->>>>>>> main
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -1350,7 +1347,7 @@ function printCanvas() {
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
-            border: 1px solid #d0d0d0;
+            border: 0;
           }
         </style>
       </head>
