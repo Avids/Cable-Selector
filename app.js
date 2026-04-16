@@ -25,6 +25,8 @@ const CABLE_DATA = [
 const TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS = [600, 480, 208];
 const TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS = [480, 208];
 const TRANSFORMER_KVA_OPTIONS = [3, 6, 9, 15, 30, 45, 75, 100, 112.5, 150, 225, 300, 450, 500, 600];
+const SYSTEM_VOLTAGE_OPTIONS = [600, 480, 347, 240, 208, 120];
+const PHASE_OPTIONS = [1, 3];
 
 const COMP_DEFS = {
   utility:     { w:80,  h:80,  label:'Utility',      color:'#89b4fa', titleColor:'#89b4fa',
@@ -34,13 +36,13 @@ const COMP_DEFS = {
   panel:       { w:90,  h:80,  label:'Panel',        color:'#94e2d5', titleColor:'#94e2d5',
                  defaults:{name:'MDP', voltage:120, phases:3, main_amps:200, short_ckt_kA:10, mfr:'Square D'} },
   breaker:     { w:60,  h:80,  label:'Breaker',      color:'#74c7ec', titleColor:'#74c7ec',
-                 defaults:{name:'CB-1', amps:20, poles:1, voltage:120, kaic:10, type:'Thermal-Mag', mfr:'Square D'} },
+                 defaults:{name:'CB-1', amps:20, poles:1, voltage:120, phases:1, kaic:10, type:'Thermal-Mag', mfr:'Square D'} },
   fuse:        { w:60,  h:80,  label:'Fuse Disc.',   color:'#fab387', titleColor:'#fab387',
-                 defaults:{name:'FD-1', amps:30, voltage:600, fuse_class:'RK5', poles:3} },
+                 defaults:{name:'FD-1', amps:30, voltage:600, phases:3, fuse_class:'RK5', poles:3} },
   bus:         { w:110, h:50,  label:'Bus Bar',      color:'#f9e2af', titleColor:'#f9e2af',
                  defaults:{name:'BUS-1', voltage:120, amps:400, phases:3} },
   cable:       { w:90,  h:60,  label:'Cable',        color:'#a6e3a1', titleColor:'#a6e3a1',
-                 defaults:{name:'CAB-1', conductors:3, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120} },
+                 defaults:{name:'CAB-1', conductors:3, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120, phases:3} },
   load:        { w:60,  h:80,  label:'Load',         color:'#f38ba8', titleColor:'#f38ba8',
                  defaults:{name:'LOAD-1', current:20, voltage:120, phases:1} },
   meter:       { w:70,  h:70,  label:'Meter',        color:'#b4befe', titleColor:'#b4befe',
@@ -48,12 +50,12 @@ const COMP_DEFS = {
 };
 
 const FIELD_DEFS = {
-  utility:     [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'phases',l:'Phases',t:'number'},{k:'fault_kA',l:'Fault (kA)',t:'number'}],
+  utility:     [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'fault_kA',l:'Fault (kA)',t:'number'}],
   transformer: [{k:'name',l:'Tag'},{k:'kva',l:'KVA',t:'select',options:TRANSFORMER_KVA_OPTIONS},{k:'primary_v',l:'Primary V',t:'select',options:TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS},{k:'secondary_v',l:'Secondary V',t:'select',options:TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
-  panel:       [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'phases',l:'Phases',t:'number'},{k:'main_amps',l:'Main Amps',t:'number'},{k:'short_ckt_kA',l:'SCCR (kA)',t:'number'},{k:'mfr',l:'Manufacturer'}],
-  breaker:     [{k:'name',l:'Tag'},{k:'amps',l:'Trip (A)',t:'number'},{k:'poles',l:'Poles',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'kaic',l:'kAIC',t:'number'},{k:'type',l:'Trip Type'},{k:'mfr',l:'Manufacturer'}],
-  fuse:        [{k:'name',l:'Tag'},{k:'amps',l:'Rating (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'fuse_class',l:'Fuse Class'},{k:'poles',l:'Poles',t:'number'}],
-  bus:         [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'amps',l:'Ampacity (A)',t:'number'},{k:'phases',l:'Phases',t:'number'}],
+  panel:       [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'main_amps',l:'Main Amps',t:'number'},{k:'short_ckt_kA',l:'SCCR (kA)',t:'number'},{k:'mfr',l:'Manufacturer'}],
+  breaker:     [{k:'name',l:'Tag'},{k:'amps',l:'Trip (A)',t:'number'},{k:'poles',l:'Poles',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'kaic',l:'kAIC',t:'number'},{k:'type',l:'Trip Type'},{k:'mfr',l:'Manufacturer'}],
+  fuse:        [{k:'name',l:'Tag'},{k:'amps',l:'Rating (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'fuse_class',l:'Fuse Class'},{k:'poles',l:'Poles',t:'number'}],
+  bus:         [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'amps',l:'Ampacity (A)',t:'number'},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS}],
   cable: [
   {k:'name',l:'Tag'},
   {k:'size',l:'Size', t:'select', options: CABLE_DATA.map(d => d.size)}, // Changed to select
@@ -62,9 +64,10 @@ const FIELD_DEFS = {
   {k:'insulation',l:'Insulation'},
   {k:'length',l:'Length (m)',t:'number'},
   {k:'amps',l:'Load Amps (A)',t:'number'},
-  {k:'voltage',l:'Voltage (V)',t:'number'}
+  {k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},
+  {k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS}
 ],
-  load:        [{k:'name',l:'Tag'},{k:'current',l:'Current (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'phases',l:'Phases',t:'select',options:[1,3]}],
+  load:        [{k:'name',l:'Tag'},{k:'current',l:'Current (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS}],
   meter:       [{k:'name',l:'Tag'},{k:'type',l:'Type'},{k:'ct_ratio',l:'CT Ratio'},{k:'voltage',l:'Voltage (V)',t:'number'}],
 };
 
@@ -262,27 +265,15 @@ function draw() {
 }
 
 function drawWire(pa, pb, selected) {
-  const dx = pb.x - pa.x;
-  const dy = pb.y - pa.y;
-  const mx = pa.x + dx / 2;
-
+  const points = getWirePolylinePoints(pa, pb);
   ctx.beginPath();
   const defaultWire = canvasStyle === 'engineering' ? '#8a1111' : '#3d4166';
   const selectedWire = canvasStyle === 'engineering' ? '#c22a2a' : '#89b4fa';
   ctx.strokeStyle = selected ? selectedWire : defaultWire;
   ctx.lineWidth = (selected ? 2 : 1.5) / zoom;
-  ctx.moveTo(pa.x, pa.y);
-
-  if (canvasStyle === 'engineering') {
-    ctx.lineTo(mx, pa.y);
-    ctx.lineTo(mx, pb.y);
-    ctx.lineTo(pb.x, pb.y);
-  } else {
-    if (Math.abs(dx) > Math.abs(dy)) {
-      ctx.bezierCurveTo(mx, pa.y, mx, pb.y, pb.x, pb.y);
-    } else {
-      ctx.bezierCurveTo(pa.x, pa.y + dy/2, pb.x, pb.y - dy/2, pb.x, pb.y);
-    }
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
   }
   ctx.stroke();
 
@@ -707,15 +698,23 @@ function wireHitTest(w, wx, wy) {
   const pa = getPorts(a).find(p => p.id === w.fromPort);
   const pb = getPorts(b).find(p => p.id === w.toPort);
   if (!pa || !pb) return false;
-  // sample bezier
-  for (let t = 0; t <= 1; t += 0.05) {
-    const mt = 1 - t;
-    const mx = (pa.x + pb.x) / 2;
-    const bx = mt*mt*mt*pa.x + 3*mt*mt*t*mx + 3*mt*t*t*mx + t*t*t*pb.x;
-    const by = mt*mt*mt*pa.y + 3*mt*mt*t*pa.y + 3*mt*t*t*pb.y + t*t*t*pb.y;
-    if (Math.hypot(wx-bx, wy-by) < 8/zoom) return true;
+  const points = getWirePolylinePoints(pa, pb);
+  for (let i = 0; i < points.length - 1; i++) {
+    if (distancePointToSegment(wx, wy, points[i], points[i + 1]) < 8 / zoom) {
+      return true;
+    }
   }
   return false;
+}
+
+function distancePointToSegment(px, py, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  if (dx === 0 && dy === 0) return Math.hypot(px - a.x, py - a.y);
+  const t = Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / (dx * dx + dy * dy)));
+  const cx = a.x + t * dx;
+  const cy = a.y + t * dy;
+  return Math.hypot(px - cx, py - cy);
 }
 
 // ═══════════════════════════════════════════════════
@@ -851,6 +850,11 @@ function setMode(m) {
   draw();
 }
 
+function setWireRouting(routing) {
+  wireRouting = routing === 'straight' ? 'straight' : 'orthogonal';
+  draw();
+}
+
 // ═══════════════════════════════════════════════════
 // ZOOM
 // ═══════════════════════════════════════════════════
@@ -913,6 +917,38 @@ function clearAll() {
   nodes = []; wires = []; selected = null;
   syncCableVoltages();
   showEmptyProps();
+  draw();
+}
+
+function alignAllComponents() {
+  if (nodes.length === 0) return;
+  const sorted = [...nodes].sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  const rowThreshold = 80;
+  const spacingX = 170;
+  const spacingY = 140;
+  const minX = Math.min(...sorted.map(n => n.x));
+  const minY = Math.min(...sorted.map(n => n.y));
+  const rows = [];
+
+  for (const node of sorted) {
+    let row = rows.find(r => Math.abs(node.y - r.baseY) <= rowThreshold);
+    if (!row) {
+      row = { baseY: node.y, nodes: [] };
+      rows.push(row);
+    }
+    row.nodes.push(node);
+  }
+
+  rows.forEach((row, rowIndex) => {
+    row.nodes.sort((a, b) => a.x - b.x);
+    const alignedY = Math.round((minY + rowIndex * spacingY) / 10) * 10;
+    row.nodes.forEach((node, colIndex) => {
+      node.x = Math.round((minX + colIndex * spacingX) / 10) * 10;
+      node.y = alignedY;
+    });
+  });
+
+  syncCableVoltages();
   draw();
 }
 
@@ -984,7 +1020,7 @@ function runCableCalc() {
   const A = row.area;
   const rho = mat === 'al' ? 0.0282 : 0.0172; // Ω·mm²/m
   const R = rho / A; // Ω/m
-  const phases = (p.conductors || 1) >= 3 ? 3 : 1;
+  const phases = p.phases || ((p.conductors || 1) >= 3 ? 3 : 1);
   const factor = phases === 3 ? Math.sqrt(3) : 2;
   const vd = factor * I * R * L;
   const vd_pct = V > 0 ? (vd / V * 100) : 0;
@@ -1176,7 +1212,7 @@ function showFeederList() {
     const A = row.area;
     const rho = mat === 'al' ? 0.0282 : 0.0172;
     const R = rho / A;
-    const phases = (p.conductors || 1) >= 3 ? 3 : 1;
+    const phases = p.phases || ((p.conductors || 1) >= 3 ? 3 : 1);
     const factor = phases === 3 ? Math.sqrt(3) : 2;
     const vd = factor * I * R * L;
     const vd_pct = V > 0 ? (vd / V * 100) : 0;
@@ -1226,7 +1262,7 @@ function exportCSV() {
     const A = row.area;
     const rho = mat === 'al' ? 0.0282 : 0.0172;
     const R = rho / A;
-    const phases = (p.conductors || 1) >= 3 ? 3 : 1;
+    const phases = p.phases || ((p.conductors || 1) >= 3 ? 3 : 1);
     const factor = phases === 3 ? Math.sqrt(3) : 2;
     const vd = factor * I * R * L;
     const vd_pct = V > 0 ? (vd / V * 100) : 0;
