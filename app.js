@@ -94,6 +94,7 @@ let selectionBox = null;
 
 let hoverNode = null;
 let hoverPortInfo = null;
+let canvasStyle = 'engineering';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -189,6 +190,7 @@ function nodeIntersectsRect(node, rect) {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawCanvasBackdrop();
   ctx.save();
   ctx.translate(pan.x, pan.y);
   ctx.scale(zoom, zoom);
@@ -244,11 +246,11 @@ function draw() {
         const isHover = hoverPortInfo && hoverPortInfo.node === n && hoverPortInfo.port.id === p.id;
         ctx.beginPath();
         ctx.arc(p.x, p.y, isHover ? 7/zoom : 4/zoom, 0, Math.PI * 2);
-        ctx.strokeStyle = '#89b4fa';
+        ctx.strokeStyle = canvasStyle === 'engineering' ? '#7f1919' : '#89b4fa';
         ctx.lineWidth = 1.5 / zoom;
         ctx.stroke();
         if (isHover) {
-          ctx.fillStyle = 'rgba(137,180,250,0.3)';
+          ctx.fillStyle = canvasStyle === 'engineering' ? 'rgba(127,25,25,0.2)' : 'rgba(137,180,250,0.3)';
           ctx.fill();
         }
       }
@@ -264,19 +266,27 @@ function drawWire(pa, pb, selected) {
   const mx = pa.x + dx / 2;
 
   ctx.beginPath();
-  ctx.strokeStyle = selected ? '#89b4fa' : '#3d4166';
+  const defaultWire = canvasStyle === 'engineering' ? '#8a1111' : '#3d4166';
+  const selectedWire = canvasStyle === 'engineering' ? '#c22a2a' : '#89b4fa';
+  ctx.strokeStyle = selected ? selectedWire : defaultWire;
   ctx.lineWidth = (selected ? 2 : 1.5) / zoom;
   ctx.moveTo(pa.x, pa.y);
 
-  if (Math.abs(dx) > Math.abs(dy)) {
-    ctx.bezierCurveTo(mx, pa.y, mx, pb.y, pb.x, pb.y);
+  if (canvasStyle === 'engineering') {
+    ctx.lineTo(mx, pa.y);
+    ctx.lineTo(mx, pb.y);
+    ctx.lineTo(pb.x, pb.y);
   } else {
-    ctx.bezierCurveTo(pa.x, pa.y + dy/2, pb.x, pb.y - dy/2, pb.x, pb.y);
+    if (Math.abs(dx) > Math.abs(dy)) {
+      ctx.bezierCurveTo(mx, pa.y, mx, pb.y, pb.x, pb.y);
+    } else {
+      ctx.bezierCurveTo(pa.x, pa.y + dy/2, pb.x, pb.y - dy/2, pb.x, pb.y);
+    }
   }
   ctx.stroke();
 
   // Junction dots
-  ctx.fillStyle = selected ? '#89b4fa' : '#6c7086';
+  ctx.fillStyle = selected ? selectedWire : (canvasStyle === 'engineering' ? '#8a1111' : '#6c7086');
   ctx.beginPath(); ctx.arc(pa.x, pa.y, 3/zoom, 0, Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.arc(pb.x, pb.y, 3/zoom, 0, Math.PI*2); ctx.fill();
 }
@@ -286,6 +296,34 @@ function drawNode(n, isSel, isHov) {
   const { x, y, w, h } = { x: n.x, y: n.y, w: d.w, h: d.h };
   const lw = 1 / zoom;
   ctx.save();
+
+  if (canvasStyle === 'engineering') {
+    if (isSel) {
+      ctx.strokeStyle = '#bf2d2d';
+      ctx.lineWidth = 1.4 / zoom;
+      ctx.setLineDash([5 / zoom, 3 / zoom]);
+      ctx.strokeRect(x - 6 / zoom, y - 6 / zoom, w + 12 / zoom, h + 12 / zoom);
+      ctx.setLineDash([]);
+    }
+
+    ctx.strokeStyle = '#8a1111';
+    ctx.fillStyle = '#8a1111';
+    ctx.lineWidth = 1.6 / zoom;
+    drawSymbol(ctx, n.type, x, y + 8/zoom, w, h - 24/zoom, zoom);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#7f1919';
+    ctx.textBaseline = 'bottom';
+    ctx.font = `600 ${11/zoom}px "IBM Plex Mono", monospace`;
+    ctx.fillText((n.props.name || d.label).toUpperCase(), x + w/2, y - 2/zoom);
+
+    const meta = getEngineeringMeta(n);
+    ctx.textBaseline = 'top';
+    ctx.font = `500 ${9/zoom}px "IBM Plex Mono", monospace`;
+    meta.forEach((line, i) => ctx.fillText(line.toUpperCase(), x + w/2, y + h + (i * 11)/zoom));
+    ctx.restore();
+    return;
+  }
 
   // Selection glow
   if (isSel) {
@@ -326,6 +364,29 @@ function drawNode(n, isSel, isHov) {
   ctx.textBaseline = 'bottom';
   ctx.fillText(n.props.name || d.label, x + w/2, y + h - 3/zoom);
 
+  ctx.restore();
+}
+
+function getEngineeringMeta(n) {
+  switch (n.type) {
+    case 'utility': return [`${n.props.voltage || '—'}V`, `${n.props.phases || '—'}PH`];
+    case 'transformer': return [`${n.props.kva || '—'}kVA`, `${n.props.primary_v || '—'}/${n.props.secondary_v || '—'}V`];
+    case 'panel': return [`MAIN ${n.props.main_amps || '—'}A`, `${n.props.short_ckt_kA || '—'}kA SCCR`];
+    case 'breaker': return [`CB ${n.props.amps || '—'}A`, `${n.props.poles || '—'}P`];
+    case 'fuse': return [`FD ${n.props.amps || '—'}A`, `CLASS ${n.props.fuse_class || '—'}`];
+    case 'bus': return [`BUS ${n.props.amps || '—'}A`, `${n.props.voltage || '—'}V`];
+    case 'cable': return [`${n.props.conductors || '—'}C ${n.props.size || '—'}`, `${n.props.length || '—'}m`];
+    case 'load': return [`${n.props.current || '—'}A`, `${n.props.voltage || '—'}V`];
+    case 'meter': return [`${n.props.type || '—'}`, `${n.props.ct_ratio || '—'}`];
+    default: return [];
+  }
+}
+
+function drawCanvasBackdrop() {
+  if (canvasStyle !== 'engineering') return;
+  ctx.save();
+  ctx.fillStyle = '#e9e9e9';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 }
 
@@ -736,6 +797,15 @@ function updateProp(input) {
 // ═══════════════════════════════════════════════════
 // MODE
 // ═══════════════════════════════════════════════════
+
+function toggleCanvasStyle() {
+  canvasStyle = canvasStyle === 'engineering' ? 'modern' : 'engineering';
+  wrap.classList.toggle('engineering', canvasStyle === 'engineering');
+  const btn = document.getElementById('btn-canvas-style');
+  btn.classList.toggle('active', canvasStyle === 'engineering');
+  btn.textContent = canvasStyle === 'engineering' ? 'Engineering Canvas' : 'Modern Canvas';
+  draw();
+}
 
 function setMode(m) {
   mode = m;
@@ -1220,3 +1290,5 @@ document.addEventListener('keydown', e => {
 // ═══════════════════════════════════════════════════
 
 resetView();
+wrap.classList.toggle('engineering', canvasStyle === 'engineering');
+document.getElementById('btn-canvas-style').classList.toggle('active', canvasStyle === 'engineering');
