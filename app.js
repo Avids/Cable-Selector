@@ -95,6 +95,7 @@ let selectionBox = null;
 let hoverNode = null;
 let hoverPortInfo = null;
 let canvasStyle = 'engineering';
+let wireRouting = 'orthogonal';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
