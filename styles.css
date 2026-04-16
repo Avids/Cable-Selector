@@ -144,10 +144,7 @@
   }
   #canvas-wrap.engineering {
     background: #e9e9e9;
-    background-image:
-      linear-gradient(to right, #d7d7d7 1px, transparent 1px),
-      linear-gradient(to bottom, #d7d7d7 1px, transparent 1px);
-    background-size: 32px 32px;
+    background-image: none;
   }
   #canvas {
     position: absolute;

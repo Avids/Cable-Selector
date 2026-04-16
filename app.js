@@ -387,21 +387,6 @@ function drawCanvasBackdrop() {
   ctx.save();
   ctx.fillStyle = '#e9e9e9';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = '#d1d1d1';
-  ctx.lineWidth = 1;
-  const grid = 32;
-  for (let x = 0; x < canvas.width; x += grid) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, canvas.height);
-    ctx.stroke();
-  }
-  for (let y = 0; y < canvas.height; y += grid) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(canvas.width, y);
-    ctx.stroke();
-  }
   ctx.restore();
 }
 
