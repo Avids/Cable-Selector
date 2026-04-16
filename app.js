@@ -335,9 +335,10 @@ function drawNode(n, isSel, isHov) {
     ctx.fillText((n.props.name || d.label).toUpperCase(), x + w/2, y - 2/zoom);
 
     const meta = showComponentSpecs ? getComponentSpecs(n) : [];
-    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
     ctx.font = `500 ${9/zoom}px "IBM Plex Mono", monospace`;
-    meta.forEach((line, i) => ctx.fillText(line.toUpperCase(), x + w/2, y + h + (i * 11)/zoom));
+    meta.forEach((line, i) => ctx.fillText(line.toUpperCase(), x + w + 8/zoom, y + 18/zoom + (i * 10)/zoom));
     ctx.restore();
     return;
   }
