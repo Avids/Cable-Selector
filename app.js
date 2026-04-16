@@ -312,17 +312,18 @@ function drawNode(n, isSel, isHov) {
     ctx.lineWidth = 1.6 / zoom;
     drawSymbol(ctx, n.type, x, y + 8/zoom, w, h - 24/zoom, zoom);
 
-    const labelX = x + w + 8/zoom;
-    const labelY = y + 3/zoom;
+    const textX = x + w + 8 / zoom;
+    const textY = y + 2 / zoom;
+    const name = (n.props.name || d.label).toUpperCase();
+    const meta = getEngineeringMeta(n);
+
     ctx.textAlign = 'left';
     ctx.fillStyle = '#7f1919';
     ctx.textBaseline = 'top';
     ctx.font = `700 ${11/zoom}px "IBM Plex Mono", monospace`;
-    ctx.fillText((n.props.name || d.label).toUpperCase(), labelX, labelY);
-
-    const meta = getEngineeringMeta(n);
+    ctx.fillText(name, textX, textY);
     ctx.font = `500 ${9/zoom}px "IBM Plex Mono", monospace`;
-    meta.forEach((line, i) => ctx.fillText(line.toUpperCase(), labelX, labelY + (14 + i * 11)/zoom));
+    meta.forEach((line, i) => ctx.fillText(line.toUpperCase(), textX, textY + (13 + i * 11) / zoom));
     ctx.restore();
     return;
   }
