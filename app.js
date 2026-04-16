@@ -1287,11 +1287,15 @@ function loadProject(e) {
       showComponentSpecs = d.showComponentSpecs !== false;
       wrap.classList.toggle('engineering', canvasStyle === 'engineering');
       const styleBtn = document.getElementById('btn-canvas-style');
-      styleBtn.classList.toggle('active', canvasStyle === 'engineering');
-      styleBtn.textContent = canvasStyle === 'engineering' ? 'Engineering Canvas' : 'Modern Canvas';
+      if (styleBtn) {
+        styleBtn.classList.toggle('active', canvasStyle === 'engineering');
+        styleBtn.textContent = canvasStyle === 'engineering' ? 'Engineering Canvas' : 'Modern Canvas';
+      }
       const specsBtn = document.getElementById('btn-specs');
-      specsBtn.classList.toggle('active', showComponentSpecs);
-      specsBtn.textContent = showComponentSpecs ? 'Specs: On' : 'Specs: Off';
+      if (specsBtn) {
+        specsBtn.classList.toggle('active', showComponentSpecs);
+        specsBtn.textContent = showComponentSpecs ? 'Specs: On' : 'Specs: Off';
+      }
       syncCableVoltages();
       document.getElementById('zoom-label').textContent = Math.round(zoom * 100) + '%';
       selected = null;
@@ -1325,7 +1329,10 @@ document.addEventListener('keydown', e => {
 
 resetView();
 wrap.classList.toggle('engineering', canvasStyle === 'engineering');
-document.getElementById('btn-canvas-style').classList.toggle('active', canvasStyle === 'engineering');
+const canvasStyleBtn = document.getElementById('btn-canvas-style');
+if (canvasStyleBtn) canvasStyleBtn.classList.toggle('active', canvasStyle === 'engineering');
 const specsBtn = document.getElementById('btn-specs');
-specsBtn.classList.toggle('active', showComponentSpecs);
-specsBtn.textContent = showComponentSpecs ? 'Specs: On' : 'Specs: Off';
+if (specsBtn) {
+  specsBtn.classList.toggle('active', showComponentSpecs);
+  specsBtn.textContent = showComponentSpecs ? 'Specs: On' : 'Specs: Off';
+}
