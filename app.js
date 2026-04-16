@@ -1262,13 +1262,25 @@ function printCanvas() {
   exportCtx.drawImage(canvas, 0, 0);
 
   const imageDataUrl = exportCanvas.toDataURL('image/png');
-  const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
-  if (!printWindow) {
-    alert('Popup blocked. Please allow popups to print the canvas.');
+  const printFrame = document.createElement('iframe');
+  printFrame.style.position = 'fixed';
+  printFrame.style.right = '0';
+  printFrame.style.bottom = '0';
+  printFrame.style.width = '0';
+  printFrame.style.height = '0';
+  printFrame.style.border = '0';
+  printFrame.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(printFrame);
+
+  const printDoc = printFrame.contentDocument || printFrame.contentWindow?.document;
+  if (!printDoc) {
+    document.body.removeChild(printFrame);
+    alert('Unable to initialize print preview in this browser.');
     return;
   }
 
-  printWindow.document.write(`
+  printDoc.open();
+  printDoc.write(`
     <!doctype html>
     <html>
       <head>
@@ -1296,15 +1308,32 @@ function printCanvas() {
         </style>
       </head>
       <body>
-        <img src="${imageDataUrl}" alt="Canvas export for printing">
+        <img id="print-image" src="${imageDataUrl}" alt="Canvas export for printing">
       </body>
     </html>
   `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.onload = () => {
-    printWindow.print();
+  printDoc.close();
+
+  const printImage = printDoc.getElementById('print-image');
+  const triggerPrint = () => {
+    const w = printFrame.contentWindow;
+    if (!w) return;
+    w.focus();
+    w.print();
+    setTimeout(() => {
+      if (printFrame.parentNode) printFrame.parentNode.removeChild(printFrame);
+    }, 500);
   };
+
+  if (printImage && !printImage.complete) {
+    printImage.onload = triggerPrint;
+    printImage.onerror = () => {
+      if (printFrame.parentNode) printFrame.parentNode.removeChild(printFrame);
+      alert('Failed to render canvas image for printing.');
+    };
+  } else {
+    triggerPrint();
+  }
 }
 
 function loadProject(e) {
