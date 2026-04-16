@@ -25,6 +25,8 @@ const CABLE_DATA = [
 const TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS = [600, 480, 208];
 const TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS = [480, 208];
 const TRANSFORMER_KVA_OPTIONS = [3, 6, 9, 15, 30, 45, 75, 100, 112.5, 150, 225, 300, 450, 500, 600];
+const SYSTEM_VOLTAGE_OPTIONS = [600, 480, 347, 240, 208, 120];
+const PHASE_OPTIONS = [1, 3];
 
 const COMP_DEFS = {
   utility:     { w:80,  h:80,  label:'Utility',      color:'#89b4fa', titleColor:'#89b4fa',
@@ -34,13 +36,13 @@ const COMP_DEFS = {
   panel:       { w:90,  h:80,  label:'Panel',        color:'#94e2d5', titleColor:'#94e2d5',
                  defaults:{name:'MDP', voltage:120, phases:3, main_amps:200, short_ckt_kA:10, mfr:'Square D'} },
   breaker:     { w:60,  h:80,  label:'Breaker',      color:'#74c7ec', titleColor:'#74c7ec',
-                 defaults:{name:'CB-1', amps:20, poles:1, voltage:120, kaic:10, type:'Thermal-Mag', mfr:'Square D'} },
+                 defaults:{name:'CB-1', amps:20, poles:1, voltage:120, phases:1, kaic:10, type:'Thermal-Mag', mfr:'Square D'} },
   fuse:        { w:60,  h:80,  label:'Fuse Disc.',   color:'#fab387', titleColor:'#fab387',
-                 defaults:{name:'FD-1', amps:30, voltage:600, fuse_class:'RK5', poles:3} },
+                 defaults:{name:'FD-1', amps:30, voltage:600, phases:3, fuse_class:'RK5', poles:3} },
   bus:         { w:110, h:50,  label:'Bus Bar',      color:'#f9e2af', titleColor:'#f9e2af',
                  defaults:{name:'BUS-1', voltage:120, amps:400, phases:3} },
   cable:       { w:90,  h:60,  label:'Cable',        color:'#a6e3a1', titleColor:'#a6e3a1',
-                 defaults:{name:'CAB-1', conductors:3, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120} },
+                 defaults:{name:'CAB-1', conductors:3, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120, phases:3} },
   load:        { w:60,  h:80,  label:'Load',         color:'#f38ba8', titleColor:'#f38ba8',
                  defaults:{name:'LOAD-1', current:20, voltage:120, phases:1} },
   meter:       { w:70,  h:70,  label:'Meter',        color:'#b4befe', titleColor:'#b4befe',
@@ -48,12 +50,12 @@ const COMP_DEFS = {
 };
 
 const FIELD_DEFS = {
-  utility:     [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'phases',l:'Phases',t:'number'},{k:'fault_kA',l:'Fault (kA)',t:'number'}],
+  utility:     [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'fault_kA',l:'Fault (kA)',t:'number'}],
   transformer: [{k:'name',l:'Tag'},{k:'kva',l:'KVA',t:'select',options:TRANSFORMER_KVA_OPTIONS},{k:'primary_v',l:'Primary V',t:'select',options:TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS},{k:'secondary_v',l:'Secondary V',t:'select',options:TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
-  panel:       [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'phases',l:'Phases',t:'number'},{k:'main_amps',l:'Main Amps',t:'number'},{k:'short_ckt_kA',l:'SCCR (kA)',t:'number'},{k:'mfr',l:'Manufacturer'}],
-  breaker:     [{k:'name',l:'Tag'},{k:'amps',l:'Trip (A)',t:'number'},{k:'poles',l:'Poles',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'kaic',l:'kAIC',t:'number'},{k:'type',l:'Trip Type'},{k:'mfr',l:'Manufacturer'}],
-  fuse:        [{k:'name',l:'Tag'},{k:'amps',l:'Rating (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'fuse_class',l:'Fuse Class'},{k:'poles',l:'Poles',t:'number'}],
-  bus:         [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'amps',l:'Ampacity (A)',t:'number'},{k:'phases',l:'Phases',t:'number'}],
+  panel:       [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'main_amps',l:'Main Amps',t:'number'},{k:'short_ckt_kA',l:'SCCR (kA)',t:'number'},{k:'mfr',l:'Manufacturer'}],
+  breaker:     [{k:'name',l:'Tag'},{k:'amps',l:'Trip (A)',t:'number'},{k:'poles',l:'Poles',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'kaic',l:'kAIC',t:'number'},{k:'type',l:'Trip Type'},{k:'mfr',l:'Manufacturer'}],
+  fuse:        [{k:'name',l:'Tag'},{k:'amps',l:'Rating (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'fuse_class',l:'Fuse Class'},{k:'poles',l:'Poles',t:'number'}],
+  bus:         [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'amps',l:'Ampacity (A)',t:'number'},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS}],
   cable: [
   {k:'name',l:'Tag'},
   {k:'size',l:'Size', t:'select', options: CABLE_DATA.map(d => d.size)}, // Changed to select
@@ -62,9 +64,10 @@ const FIELD_DEFS = {
   {k:'insulation',l:'Insulation'},
   {k:'length',l:'Length (m)',t:'number'},
   {k:'amps',l:'Load Amps (A)',t:'number'},
-  {k:'voltage',l:'Voltage (V)',t:'number'}
+  {k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},
+  {k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS}
 ],
-  load:        [{k:'name',l:'Tag'},{k:'current',l:'Current (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'number'},{k:'phases',l:'Phases',t:'select',options:[1,3]}],
+  load:        [{k:'name',l:'Tag'},{k:'current',l:'Current (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS}],
   meter:       [{k:'name',l:'Tag'},{k:'type',l:'Type'},{k:'ct_ratio',l:'CT Ratio'},{k:'voltage',l:'Voltage (V)',t:'number'}],
 };
 
@@ -888,7 +891,7 @@ function runCableCalc() {
   const A = row.area;
   const rho = mat === 'al' ? 0.0282 : 0.0172; // Ω·mm²/m
   const R = rho / A; // Ω/m
-  const phases = (p.conductors || 1) >= 3 ? 3 : 1;
+  const phases = p.phases || ((p.conductors || 1) >= 3 ? 3 : 1);
   const factor = phases === 3 ? Math.sqrt(3) : 2;
   const vd = factor * I * R * L;
   const vd_pct = V > 0 ? (vd / V * 100) : 0;
@@ -1080,7 +1083,7 @@ function showFeederList() {
     const A = row.area;
     const rho = mat === 'al' ? 0.0282 : 0.0172;
     const R = rho / A;
-    const phases = (p.conductors || 1) >= 3 ? 3 : 1;
+    const phases = p.phases || ((p.conductors || 1) >= 3 ? 3 : 1);
     const factor = phases === 3 ? Math.sqrt(3) : 2;
     const vd = factor * I * R * L;
     const vd_pct = V > 0 ? (vd / V * 100) : 0;
@@ -1130,7 +1133,7 @@ function exportCSV() {
     const A = row.area;
     const rho = mat === 'al' ? 0.0282 : 0.0172;
     const R = rho / A;
-    const phases = (p.conductors || 1) >= 3 ? 3 : 1;
+    const phases = p.phases || ((p.conductors || 1) >= 3 ? 3 : 1);
     const factor = phases === 3 ? Math.sqrt(3) : 2;
     const vd = factor * I * R * L;
     const vd_pct = V > 0 ? (vd / V * 100) : 0;
