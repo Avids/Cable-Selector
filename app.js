@@ -95,6 +95,7 @@ let selectionBox = null;
 let hoverNode = null;
 let hoverPortInfo = null;
 let canvasStyle = 'engineering';
+let suppressCanvasBackdrop = false;
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -383,7 +384,7 @@ function getEngineeringMeta(n) {
 }
 
 function drawCanvasBackdrop() {
-  if (canvasStyle !== 'engineering') return;
+  if (suppressCanvasBackdrop || canvasStyle !== 'engineering') return;
   ctx.save();
   ctx.fillStyle = '#e9e9e9';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1247,19 +1248,17 @@ function saveProject() {
 }
 
 function printCanvas() {
+  suppressCanvasBackdrop = true;
   draw();
   const exportCanvas = document.createElement('canvas');
   exportCanvas.width = canvas.width;
   exportCanvas.height = canvas.height;
   const exportCtx = exportCanvas.getContext('2d');
-
-  if (canvasStyle === 'engineering') {
-    exportCtx.fillStyle = '#e9e9e9';
-  } else {
-    exportCtx.fillStyle = '#0f1117';
-  }
+  exportCtx.fillStyle = '#ffffff';
   exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
   exportCtx.drawImage(canvas, 0, 0);
+  suppressCanvasBackdrop = false;
+  draw();
 
   const imageDataUrl = exportCanvas.toDataURL('image/png');
   const printFrame = document.createElement('iframe');
