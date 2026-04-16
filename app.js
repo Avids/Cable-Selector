@@ -322,9 +322,8 @@ function drawNode(n, isSel, isHov) {
     ctx.textBaseline = 'top';
     ctx.font = `700 ${11/zoom}px "IBM Plex Mono", monospace`;
     ctx.fillText(name, textX, textY);
-
     ctx.font = `500 ${9/zoom}px "IBM Plex Mono", monospace`;
-    meta.forEach((line, i) => ctx.fillText(line.toUpperCase(), textX, textY + (13 + (i * 11)) / zoom));
+    meta.forEach((line, i) => ctx.fillText(line.toUpperCase(), textX, textY + (13 + i * 11) / zoom));
     ctx.restore();
     return;
   }
@@ -443,17 +442,17 @@ function drawSymbol(ctx, type, x, y, w, h, zoom) {
       ctx.beginPath(); ctx.moveTo(cx-28/zoom, cy); ctx.lineTo(cx+28/zoom, cy); ctx.stroke();
       ctx.lineWidth = lw;
       for (const dx of [-18/zoom, 0, 18/zoom]) {
-        ctx.beginPath(); ctx.moveTo(cx+dx, cy-10/zoom); ctx.lineTo(cx+dx, cy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx+dx, cy); ctx.lineTo(cx+dx, cy+10/zoom); ctx.stroke();
       }
-      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy+10/zoom); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx, cy-10/zoom); ctx.lineTo(cx, cy); ctx.stroke();
       break;
     case 'cable':
       ctx.lineWidth = 2.5/zoom;
-      ctx.beginPath(); ctx.moveTo(cx-22/zoom, cy); ctx.lineTo(cx+22/zoom, cy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx, cy-22/zoom); ctx.lineTo(cx, cy+22/zoom); ctx.stroke();
       ctx.lineWidth = lw;
       ctx.setLineDash([3/zoom,2/zoom]);
-      ctx.beginPath(); ctx.moveTo(cx-22/zoom, cy-5/zoom); ctx.lineTo(cx+22/zoom, cy-5/zoom); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx-22/zoom, cy+5/zoom); ctx.lineTo(cx+22/zoom, cy+5/zoom); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx-5/zoom, cy-22/zoom); ctx.lineTo(cx-5/zoom, cy+22/zoom); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx+5/zoom, cy-22/zoom); ctx.lineTo(cx+5/zoom, cy+22/zoom); ctx.stroke();
       ctx.setLineDash([]);
       break;
     case 'load':
