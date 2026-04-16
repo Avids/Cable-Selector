@@ -98,7 +98,11 @@ let selectionBox = null;
 let hoverNode = null;
 let hoverPortInfo = null;
 let canvasStyle = 'engineering';
+<<<<<<< codex/add-canvas-printing-feature
+let suppressCanvasBackdrop = false;
+=======
 let wireRouting = 'orthogonal';
+>>>>>>> main
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -383,7 +387,7 @@ function getEngineeringMeta(n) {
 }
 
 function drawCanvasBackdrop() {
-  if (canvasStyle !== 'engineering') return;
+  if (suppressCanvasBackdrop || canvasStyle !== 'engineering') return;
   ctx.save();
   ctx.fillStyle = '#e9e9e9';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1291,6 +1295,94 @@ function saveProject() {
   a.click();
 }
 
+function printCanvas() {
+  suppressCanvasBackdrop = true;
+  draw();
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = canvas.width;
+  exportCanvas.height = canvas.height;
+  const exportCtx = exportCanvas.getContext('2d');
+  exportCtx.fillStyle = '#ffffff';
+  exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+  exportCtx.drawImage(canvas, 0, 0);
+  suppressCanvasBackdrop = false;
+  draw();
+
+  const imageDataUrl = exportCanvas.toDataURL('image/png');
+  const printFrame = document.createElement('iframe');
+  printFrame.style.position = 'fixed';
+  printFrame.style.right = '0';
+  printFrame.style.bottom = '0';
+  printFrame.style.width = '0';
+  printFrame.style.height = '0';
+  printFrame.style.border = '0';
+  printFrame.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(printFrame);
+
+  const printDoc = printFrame.contentDocument || printFrame.contentWindow?.document;
+  if (!printDoc) {
+    document.body.removeChild(printFrame);
+    alert('Unable to initialize print preview in this browser.');
+    return;
+  }
+
+  printDoc.open();
+  printDoc.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>ElectraDraw Canvas Print</title>
+        <style>
+          @page { size: auto; margin: 0.5in; }
+          html, body {
+            margin: 0;
+            padding: 0;
+            background: #fff;
+            height: 100%;
+          }
+          body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border: 1px solid #d0d0d0;
+          }
+        </style>
+      </head>
+      <body>
+        <img id="print-image" src="${imageDataUrl}" alt="Canvas export for printing">
+      </body>
+    </html>
+  `);
+  printDoc.close();
+
+  const printImage = printDoc.getElementById('print-image');
+  const triggerPrint = () => {
+    const w = printFrame.contentWindow;
+    if (!w) return;
+    w.focus();
+    w.print();
+    setTimeout(() => {
+      if (printFrame.parentNode) printFrame.parentNode.removeChild(printFrame);
+    }, 500);
+  };
+
+  if (printImage && !printImage.complete) {
+    printImage.onload = triggerPrint;
+    printImage.onerror = () => {
+      if (printFrame.parentNode) printFrame.parentNode.removeChild(printFrame);
+      alert('Failed to render canvas image for printing.');
+    };
+  } else {
+    triggerPrint();
+  }
+}
+
 function loadProject(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -1320,6 +1412,11 @@ function loadProject(e) {
 
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+    e.preventDefault();
+    printCanvas();
+    return;
+  }
   if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
   if (e.key === 'Escape') deselect();
   if (e.key === 's' || e.key === 'S') setMode('select');

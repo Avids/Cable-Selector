@@ -49,6 +49,7 @@
   <div class="sep"></div>
   <button class="tb-btn" onclick="saveProject()">↓ Save</button>
   <button class="tb-btn" onclick="document.getElementById('file-input').click()">↑ Load</button>
+  <button class="tb-btn" onclick="printCanvas()">🖨 Print Canvas</button>
   <input type="file" id="file-input" accept=".json" style="display:none" onchange="loadProject(event)">
   <div class="sep"></div>
   <button class="tb-btn review" onclick="reviewCoordination()">✓ Review Coordination</button>
@@ -155,7 +156,8 @@
       <span style="color:var(--text2)">P</span> Pan &nbsp;&nbsp;
       <span style="color:var(--text2)">Del</span> Delete<br>
       <span style="color:var(--text2)">Esc</span> Deselect<br>
-      <span style="color:var(--text2)">Scroll</span> Pan canvas
+      <span style="color:var(--text2)">Scroll</span> Pan canvas<br>
+      <span style="color:var(--text2)">Ctrl/Cmd+P</span> Print canvas
     </div>
   </div>
 
