@@ -98,6 +98,7 @@ let selectionBox = null;
 let hoverNode = null;
 let hoverPortInfo = null;
 let canvasStyle = 'engineering';
+let wireRouting = 'orthogonal';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -264,27 +265,15 @@ function draw() {
 }
 
 function drawWire(pa, pb, selected) {
-  const dx = pb.x - pa.x;
-  const dy = pb.y - pa.y;
-  const mx = pa.x + dx / 2;
-
+  const points = getWirePolylinePoints(pa, pb);
   ctx.beginPath();
   const defaultWire = canvasStyle === 'engineering' ? '#8a1111' : '#3d4166';
   const selectedWire = canvasStyle === 'engineering' ? '#c22a2a' : '#89b4fa';
   ctx.strokeStyle = selected ? selectedWire : defaultWire;
   ctx.lineWidth = (selected ? 2 : 1.5) / zoom;
-  ctx.moveTo(pa.x, pa.y);
-
-  if (canvasStyle === 'engineering') {
-    ctx.lineTo(mx, pa.y);
-    ctx.lineTo(mx, pb.y);
-    ctx.lineTo(pb.x, pb.y);
-  } else {
-    if (Math.abs(dx) > Math.abs(dy)) {
-      ctx.bezierCurveTo(mx, pa.y, mx, pb.y, pb.x, pb.y);
-    } else {
-      ctx.bezierCurveTo(pa.x, pa.y + dy/2, pb.x, pb.y - dy/2, pb.x, pb.y);
-    }
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
   }
   ctx.stroke();
 
@@ -292,6 +281,14 @@ function drawWire(pa, pb, selected) {
   ctx.fillStyle = selected ? selectedWire : (canvasStyle === 'engineering' ? '#8a1111' : '#6c7086');
   ctx.beginPath(); ctx.arc(pa.x, pa.y, 3/zoom, 0, Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.arc(pb.x, pb.y, 3/zoom, 0, Math.PI*2); ctx.fill();
+}
+
+function getWirePolylinePoints(pa, pb) {
+  if (wireRouting === 'straight') {
+    return [pa, pb];
+  }
+  const mx = pa.x + (pb.x - pa.x) / 2;
+  return [pa, { x: mx, y: pa.y }, { x: mx, y: pb.y }, pb];
 }
 
 function drawNode(n, isSel, isHov) {
@@ -694,15 +691,23 @@ function wireHitTest(w, wx, wy) {
   const pa = getPorts(a).find(p => p.id === w.fromPort);
   const pb = getPorts(b).find(p => p.id === w.toPort);
   if (!pa || !pb) return false;
-  // sample bezier
-  for (let t = 0; t <= 1; t += 0.05) {
-    const mt = 1 - t;
-    const mx = (pa.x + pb.x) / 2;
-    const bx = mt*mt*mt*pa.x + 3*mt*mt*t*mx + 3*mt*t*t*mx + t*t*t*pb.x;
-    const by = mt*mt*mt*pa.y + 3*mt*mt*t*pa.y + 3*mt*t*t*pb.y + t*t*t*pb.y;
-    if (Math.hypot(wx-bx, wy-by) < 8/zoom) return true;
+  const points = getWirePolylinePoints(pa, pb);
+  for (let i = 0; i < points.length - 1; i++) {
+    if (distancePointToSegment(wx, wy, points[i], points[i + 1]) < 8 / zoom) {
+      return true;
+    }
   }
   return false;
+}
+
+function distancePointToSegment(px, py, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  if (dx === 0 && dy === 0) return Math.hypot(px - a.x, py - a.y);
+  const t = Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / (dx * dx + dy * dy)));
+  const cx = a.x + t * dx;
+  const cy = a.y + t * dy;
+  return Math.hypot(px - cx, py - cy);
 }
 
 // ═══════════════════════════════════════════════════
@@ -828,6 +833,11 @@ function setMode(m) {
   draw();
 }
 
+function setWireRouting(routing) {
+  wireRouting = routing === 'straight' ? 'straight' : 'orthogonal';
+  draw();
+}
+
 // ═══════════════════════════════════════════════════
 // ZOOM
 // ═══════════════════════════════════════════════════
@@ -890,6 +900,38 @@ function clearAll() {
   nodes = []; wires = []; selected = null;
   syncCableVoltages();
   showEmptyProps();
+  draw();
+}
+
+function alignAllComponents() {
+  if (nodes.length === 0) return;
+  const sorted = [...nodes].sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  const rowThreshold = 80;
+  const spacingX = 170;
+  const spacingY = 140;
+  const minX = Math.min(...sorted.map(n => n.x));
+  const minY = Math.min(...sorted.map(n => n.y));
+  const rows = [];
+
+  for (const node of sorted) {
+    let row = rows.find(r => Math.abs(node.y - r.baseY) <= rowThreshold);
+    if (!row) {
+      row = { baseY: node.y, nodes: [] };
+      rows.push(row);
+    }
+    row.nodes.push(node);
+  }
+
+  rows.forEach((row, rowIndex) => {
+    row.nodes.sort((a, b) => a.x - b.x);
+    const alignedY = Math.round((minY + rowIndex * spacingY) / 10) * 10;
+    row.nodes.forEach((node, colIndex) => {
+      node.x = Math.round((minX + colIndex * spacingX) / 10) * 10;
+      node.y = alignedY;
+    });
+  });
+
+  syncCableVoltages();
   draw();
 }
 
