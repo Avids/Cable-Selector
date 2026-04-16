@@ -99,6 +99,7 @@ let hoverNode = null;
 let hoverPortInfo = null;
 let canvasStyle = 'engineering';
 let wireRouting = 'orthogonal';
+let showEngineeringSpecs = true;
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -311,16 +312,21 @@ function drawNode(n, isSel, isHov) {
     ctx.lineWidth = 1.6 / zoom;
     drawSymbol(ctx, n.type, x, y + 8/zoom, w, h - 24/zoom, zoom);
 
-    ctx.textAlign = 'center';
+    const name = (n.props.name || d.label).toUpperCase();
     ctx.fillStyle = '#7f1919';
-    ctx.textBaseline = 'bottom';
-    ctx.font = `600 ${11/zoom}px "IBM Plex Mono", monospace`;
-    ctx.fillText((n.props.name || d.label).toUpperCase(), x + w/2, y - 2/zoom);
+    ctx.font = `600 ${10/zoom}px "IBM Plex Mono", monospace`;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'right';
+    ctx.fillText(name, x - 8/zoom, y + h / 2);
 
-    const meta = getEngineeringMeta(n);
-    ctx.textBaseline = 'top';
-    ctx.font = `500 ${9/zoom}px "IBM Plex Mono", monospace`;
-    meta.forEach((line, i) => ctx.fillText(line.toUpperCase(), x + w/2, y + h + (i * 11)/zoom));
+    if (showEngineeringSpecs) {
+      const meta = getEngineeringMeta(n);
+      ctx.font = `500 ${9/zoom}px "IBM Plex Mono", monospace`;
+      ctx.textAlign = 'left';
+      const lineGap = 11 / zoom;
+      const firstLineY = y + (h / 2) - ((meta.length - 1) * lineGap) / 2;
+      meta.forEach((line, i) => ctx.fillText(line.toUpperCase(), x + w + 8/zoom, firstLineY + i * lineGap));
+    }
     ctx.restore();
     return;
   }
@@ -812,6 +818,21 @@ function toggleCanvasStyle() {
   const btn = document.getElementById('btn-canvas-style');
   btn.classList.toggle('active', canvasStyle === 'engineering');
   btn.textContent = canvasStyle === 'engineering' ? 'Engineering Canvas' : 'Modern Canvas';
+  updateEngineeringSpecsButton();
+  draw();
+}
+
+function updateEngineeringSpecsButton() {
+  const btn = document.getElementById('btn-engineering-specs');
+  if (!btn) return;
+  const enabled = canvasStyle === 'engineering' && showEngineeringSpecs;
+  btn.classList.toggle('active', enabled);
+  btn.textContent = `Specs Right: ${showEngineeringSpecs ? 'ON' : 'OFF'}`;
+}
+
+function toggleEngineeringSpecs() {
+  showEngineeringSpecs = !showEngineeringSpecs;
+  updateEngineeringSpecsButton();
   draw();
 }
 
@@ -1337,3 +1358,4 @@ document.addEventListener('keydown', e => {
 resetView();
 wrap.classList.toggle('engineering', canvasStyle === 'engineering');
 document.getElementById('btn-canvas-style').classList.toggle('active', canvasStyle === 'engineering');
+updateEngineeringSpecsButton();
