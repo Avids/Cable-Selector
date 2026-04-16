@@ -1246,6 +1246,67 @@ function saveProject() {
   a.click();
 }
 
+function printCanvas() {
+  draw();
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = canvas.width;
+  exportCanvas.height = canvas.height;
+  const exportCtx = exportCanvas.getContext('2d');
+
+  if (canvasStyle === 'engineering') {
+    exportCtx.fillStyle = '#e9e9e9';
+  } else {
+    exportCtx.fillStyle = '#0f1117';
+  }
+  exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+  exportCtx.drawImage(canvas, 0, 0);
+
+  const imageDataUrl = exportCanvas.toDataURL('image/png');
+  const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=900');
+  if (!printWindow) {
+    alert('Popup blocked. Please allow popups to print the canvas.');
+    return;
+  }
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>ElectraDraw Canvas Print</title>
+        <style>
+          @page { size: auto; margin: 0.5in; }
+          html, body {
+            margin: 0;
+            padding: 0;
+            background: #fff;
+            height: 100%;
+          }
+          body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border: 1px solid #d0d0d0;
+          }
+        </style>
+      </head>
+      <body>
+        <img src="${imageDataUrl}" alt="Canvas export for printing">
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.onload = () => {
+    printWindow.print();
+  };
+}
+
 function loadProject(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -1275,6 +1336,11 @@ function loadProject(e) {
 
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+    e.preventDefault();
+    printCanvas();
+    return;
+  }
   if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
   if (e.key === 'Escape') deselect();
   if (e.key === 's' || e.key === 'S') setMode('select');
