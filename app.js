@@ -98,7 +98,7 @@ let selectionBox = null;
 let hoverNode = null;
 let hoverPortInfo = null;
 let canvasStyle = 'engineering';
-let wireRouting = 'orthogonal';
+let showComponentSpecs = true;
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -283,12 +283,20 @@ function drawWire(pa, pb, selected) {
   ctx.beginPath(); ctx.arc(pb.x, pb.y, 3/zoom, 0, Math.PI*2); ctx.fill();
 }
 
-function getWirePolylinePoints(pa, pb) {
-  if (wireRouting === 'straight') {
-    return [pa, pb];
+
+function getComponentSpecs(n) {
+  switch (n.type) {
+    case 'utility': return [`${n.props.voltage || '—'}V`, `${n.props.phases || '—'}PH`, `${n.props.fault_kA || '—'}kA`];
+    case 'transformer': return [`${n.props.kva || '—'}kVA`, `${n.props.primary_v || '—'}/${n.props.secondary_v || '—'}V`, `${n.props.conn || '—'}`];
+    case 'panel': return [`${n.props.main_amps || '—'}A MAIN`, `${n.props.voltage || '—'}V`, `${n.props.short_ckt_kA || '—'}kA SCCR`];
+    case 'breaker': return [`${n.props.amps || '—'}A`, `${n.props.poles || '—'}P`, `${n.props.kaic || '—'}kAIC`];
+    case 'fuse': return [`${n.props.amps || '—'}A`, `CLASS ${n.props.fuse_class || '—'}`, `${n.props.poles || '—'}P`];
+    case 'bus': return [`${n.props.amps || '—'}A BUS`, `${n.props.voltage || '—'}V`, `${n.props.phases || '—'}PH`];
+    case 'cable': return [`${n.props.conductors || '—'}C ${n.props.size || '—'}`, `${n.props.material || '—'} ${n.props.insulation || '—'}`, `${n.props.length || '—'}m / ${n.props.amps || '—'}A`];
+    case 'load': return [`${n.props.current || '—'}A`, `${n.props.voltage || '—'}V`, `${n.props.phases || '—'}PH`];
+    case 'meter': return [`${n.props.type || '—'}`, `CT ${n.props.ct_ratio || '—'}`, `${n.props.voltage || '—'}V`];
+    default: return [];
   }
-  const mx = pa.x + (pb.x - pa.x) / 2;
-  return [pa, { x: mx, y: pa.y }, { x: mx, y: pb.y }, pb];
 }
 
 function drawNode(n, isSel, isHov) {
@@ -311,16 +319,17 @@ function drawNode(n, isSel, isHov) {
     ctx.lineWidth = 1.6 / zoom;
     drawSymbol(ctx, n.type, x, y + 8/zoom, w, h - 24/zoom, zoom);
 
-    ctx.textAlign = 'center';
+    ctx.textAlign = 'left';
     ctx.fillStyle = '#7f1919';
     ctx.textBaseline = 'bottom';
     ctx.font = `600 ${11/zoom}px "IBM Plex Mono", monospace`;
-    ctx.fillText((n.props.name || d.label).toUpperCase(), x + w/2, y - 2/zoom);
+    ctx.fillText((n.props.name || d.label).toUpperCase(), x, y - 2/zoom);
 
-    const meta = getEngineeringMeta(n);
-    ctx.textBaseline = 'top';
+    const meta = showComponentSpecs ? getComponentSpecs(n) : [];
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
     ctx.font = `500 ${9/zoom}px "IBM Plex Mono", monospace`;
-    meta.forEach((line, i) => ctx.fillText(line.toUpperCase(), x + w/2, y + h + (i * 11)/zoom));
+    meta.forEach((line, i) => ctx.fillText(line.toUpperCase(), x + w + 8/zoom, y + 18/zoom + (i * 10)/zoom));
     ctx.restore();
     return;
   }
@@ -360,26 +369,24 @@ function drawNode(n, isSel, isHov) {
   // Name tag
   ctx.fillStyle = '#cdd6f4';
   ctx.font = `500 ${10/zoom}px "IBM Plex Sans", sans-serif`;
-  ctx.textAlign = 'center';
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'bottom';
-  ctx.fillText(n.props.name || d.label, x + w/2, y + h - 3/zoom);
+  ctx.fillText(n.props.name || d.label, x + 5/zoom, y + h - 3/zoom);
+
+  if (showComponentSpecs) {
+    const specs = getComponentSpecs(n);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = `500 ${9/zoom}px "IBM Plex Mono", monospace`;
+    ctx.fillStyle = '#a6adc8';
+    specs.forEach((line, i) => ctx.fillText(line, x + w + 8/zoom, y + 18/zoom + (i * 10)/zoom));
+  }
 
   ctx.restore();
 }
 
 function getEngineeringMeta(n) {
-  switch (n.type) {
-    case 'utility': return [`${n.props.voltage || '—'}V`, `${n.props.phases || '—'}PH`];
-    case 'transformer': return [`${n.props.kva || '—'}kVA`, `${n.props.primary_v || '—'}/${n.props.secondary_v || '—'}V`];
-    case 'panel': return [`MAIN ${n.props.main_amps || '—'}A`, `${n.props.short_ckt_kA || '—'}kA SCCR`];
-    case 'breaker': return [`CB ${n.props.amps || '—'}A`, `${n.props.poles || '—'}P`];
-    case 'fuse': return [`FD ${n.props.amps || '—'}A`, `CLASS ${n.props.fuse_class || '—'}`];
-    case 'bus': return [`BUS ${n.props.amps || '—'}A`, `${n.props.voltage || '—'}V`];
-    case 'cable': return [`${n.props.conductors || '—'}C ${n.props.size || '—'}`, `${n.props.length || '—'}m`];
-    case 'load': return [`${n.props.current || '—'}A`, `${n.props.voltage || '—'}V`];
-    case 'meter': return [`${n.props.type || '—'}`, `${n.props.ct_ratio || '—'}`];
-    default: return [];
-  }
+  return getComponentSpecs(n);
 }
 
 function drawCanvasBackdrop() {
@@ -812,6 +819,16 @@ function toggleCanvasStyle() {
   const btn = document.getElementById('btn-canvas-style');
   btn.classList.toggle('active', canvasStyle === 'engineering');
   btn.textContent = canvasStyle === 'engineering' ? 'Engineering Canvas' : 'Modern Canvas';
+  draw();
+}
+
+function toggleComponentSpecs() {
+  showComponentSpecs = !showComponentSpecs;
+  const btn = document.getElementById('btn-specs');
+  if (btn) {
+    btn.classList.toggle('active', showComponentSpecs);
+    btn.textContent = showComponentSpecs ? 'Specs: On' : 'Specs: Off';
+  }
   draw();
 }
 
@@ -1284,7 +1301,7 @@ function getCableEndpoints(cableNode) {
 // ═══════════════════════════════════════════════════
 
 function saveProject() {
-  const data = JSON.stringify({ version:1, nodes, wires, pan, zoom, idCounter }, null, 2);
+  const data = JSON.stringify({ version:1, nodes, wires, pan, zoom, idCounter, canvasStyle, showComponentSpecs }, null, 2);
   const a = document.createElement('a');
   a.href = 'data:application/json,' + encodeURIComponent(data);
   a.download = 'sld_project.json';
@@ -1303,6 +1320,19 @@ function loadProject(e) {
       pan = d.pan || { x: 0, y: 0 };
       zoom = d.zoom || 1;
       idCounter = d.idCounter || 100;
+      canvasStyle = d.canvasStyle || 'engineering';
+      showComponentSpecs = d.showComponentSpecs !== false;
+      wrap.classList.toggle('engineering', canvasStyle === 'engineering');
+      const styleBtn = document.getElementById('btn-canvas-style');
+      if (styleBtn) {
+        styleBtn.classList.toggle('active', canvasStyle === 'engineering');
+        styleBtn.textContent = canvasStyle === 'engineering' ? 'Engineering Canvas' : 'Modern Canvas';
+      }
+      const specsBtn = document.getElementById('btn-specs');
+      if (specsBtn) {
+        specsBtn.classList.toggle('active', showComponentSpecs);
+        specsBtn.textContent = showComponentSpecs ? 'Specs: On' : 'Specs: Off';
+      }
       syncCableVoltages();
       document.getElementById('zoom-label').textContent = Math.round(zoom * 100) + '%';
       selected = null;
@@ -1336,4 +1366,10 @@ document.addEventListener('keydown', e => {
 
 resetView();
 wrap.classList.toggle('engineering', canvasStyle === 'engineering');
-document.getElementById('btn-canvas-style').classList.toggle('active', canvasStyle === 'engineering');
+const canvasStyleBtn = document.getElementById('btn-canvas-style');
+if (canvasStyleBtn) canvasStyleBtn.classList.toggle('active', canvasStyle === 'engineering');
+const specsBtn = document.getElementById('btn-specs');
+if (specsBtn) {
+  specsBtn.classList.toggle('active', showComponentSpecs);
+  specsBtn.textContent = showComponentSpecs ? 'Specs: On' : 'Specs: Off';
+}
