@@ -60,7 +60,7 @@ const FIELD_DEFS = {
   {k:'name',l:'Tag'},
   {k:'size',l:'Size', t:'select', options: CABLE_DATA.map(d => d.size)}, // Changed to select
   {k:'material',l:'Material (Cu/Al)'},
-  {k:'conductors',l:'# Conductors',t:'number'},
+  {k:'conductors',l:'# Cond / Phase',t:'number'},
   {k:'insulation',l:'Insulation'},
   {k:'length',l:'Length (m)',t:'number'},
   {k:'amps',l:'Load Amps (A)',t:'number'},
@@ -1014,6 +1014,7 @@ function runCableCalc() {
   const rho = mat === 'al' ? 0.0282 : 0.0172; // Ω·mm²/m
   const R = rho / A; // Ω/m
   const phases = p.phases || ((p.conductors || 1) >= 3 ? 3 : 1);
+  const conductorsPerPhase = Math.max(1, parseInt(p.conductors, 10) || 1);
   const factor = phases === 3 ? Math.sqrt(3) : 2;
   const vd = factor * I * R * L;
   const vd_pct = V > 0 ? (vd / V * 100) : 0;
@@ -1026,7 +1027,6 @@ function runCableCalc() {
   const ampacity = mat === 'al' ? row.al : row.cu;
   const ampOk = ampacity > 0 && I <= ampacity;
   const parallelRuns = ampacity > 0 && I > 0 ? Math.max(1, Math.ceil(I / ampacity)) : 0;
-  const effectiveAmpacity = parallelRuns > 0 ? ampacity * parallelRuns : 0;
   const minRowAmp = CABLE_DATA.find(r => {
     const cap = mat === 'al' ? r.al : r.cu;
     return cap > 0 && cap >= I;
@@ -1042,9 +1042,7 @@ function runCableCalc() {
   document.getElementById('cv-minsize').textContent = I > 0 ? minRow.size + ' AWG' : '—';
   document.getElementById('cv-ampacity').textContent = ampacity > 0 ? ampacity + ' A' : 'N/A (Al <#6)';
   document.getElementById('cv-parallel').textContent =
-    parallelRuns > 0 ? `${parallelRuns} run${parallelRuns > 1 ? 's' : ''} (${effectiveAmpacity} A total)` : 'N/A';
-  document.getElementById('cv-parallelfmt').textContent =
-    parallelRuns > 0 ? `${parallelRuns}(${p.conductors || 1}#${p.size})` : '—';
+    parallelRuns > 0 ? `${parallelRuns}(${conductorsPerPhase}#${p.size})` : '—';
 
   const statEl = document.getElementById('cv-status');
   if (!ampOk && ampacity > 0) {
