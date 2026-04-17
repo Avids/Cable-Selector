@@ -1038,7 +1038,7 @@ function runCableCalc() {
   const phases = getSystemPhaseCount(p.system, p.phases || ((p.conductors || 1) >= 3 ? 3 : 1));
   const conductorsPerPhase = Math.max(1, parseInt(p.conductors, 10) || 1);
   const factor = phases === 3 ? Math.sqrt(3) : 2;
-  const vd = factor * I * R * L;
+  const vd = (factor * I * R * L) / conductorsPerPhase;
   const vd_pct = V > 0 ? (vd / V * 100) : 0;
 
   const ampacity = mat === 'al' ? row.al : row.cu;
@@ -1224,9 +1224,9 @@ function showFeederList() {
     const phases = getSystemPhaseCount(p.system, p.phases || ((p.conductors || 1) >= 3 ? 3 : 1));
     const system = p.system || '—';
     const factor = phases === 3 ? Math.sqrt(3) : 2;
-    const vd = factor * I * R * L;
-    const vd_pct = V > 0 ? (vd / V * 100) : 0;
     const conductorsPerPhase = Math.max(1, parseInt(p.conductors, 10) || 1);
+    const vd = (factor * I * R * L) / conductorsPerPhase;
+    const vd_pct = V > 0 ? (vd / V * 100) : 0;
     const ampacity = mat === 'al' ? row.al : row.cu;
     const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
     const ampOk = totalAmpacity <= 0 || I <= totalAmpacity;
@@ -1278,9 +1278,9 @@ function exportCSV() {
     const phases = getSystemPhaseCount(p.system, p.phases || ((p.conductors || 1) >= 3 ? 3 : 1));
     const system = p.system || '';
     const factor = phases === 3 ? Math.sqrt(3) : 2;
-    const vd = factor * I * R * L;
-    const vd_pct = V > 0 ? (vd / V * 100) : 0;
     const conductorsPerPhase = Math.max(1, parseInt(p.conductors, 10) || 1);
+    const vd = (factor * I * R * L) / conductorsPerPhase;
+    const vd_pct = V > 0 ? (vd / V * 100) : 0;
     const ampacity = mat === 'al' ? row.al : row.cu;
     const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
     const ampOk = totalAmpacity <= 0 || I <= totalAmpacity;
