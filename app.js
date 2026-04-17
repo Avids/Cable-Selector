@@ -15,11 +15,12 @@ const CABLE_DATA = [
   {size:'2/0', area:67.4,  cu:145, al:115 },
   {size:'3/0', area:85.0,  cu:165, al:130 },
   {size:'4/0', area:107.0, cu:195, al:150 },
-  {size:'250', area:127.0, cu:215, al:170 },
-  {size:'300', area:152.0, cu:240, al:190 },
-  {size:'350', area:177.0, cu:260, al:210 },
-  {size:'400', area:203.0, cu:280, al:225 },
-  {size:'500', area:253.0, cu:320, al:260 },
+  {size:'#250', area:127.0, cu:215, al:170 },
+  {size:'#300', area:152.0, cu:240, al:190 },
+  {size:'#350', area:177.0, cu:260, al:210 },
+  {size:'#400', area:203.0, cu:280, al:225 },
+  {size:'#500', area:253.0, cu:320, al:260 },
+  {size:'#600', area:304.0, cu:355, al:285 },
 ];
 
 const TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS = [600, 480, 208];
@@ -42,7 +43,7 @@ const COMP_DEFS = {
   bus:         { w:110, h:50,  label:'Bus Bar',      color:'#f9e2af', titleColor:'#f9e2af',
                  defaults:{name:'BUS-1', voltage:120, amps:400, phases:3} },
   cable:       { w:90,  h:60,  label:'Cable',        color:'#a6e3a1', titleColor:'#a6e3a1',
-                 defaults:{name:'CAB-1', conductors:3, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120, phases:3} },
+                 defaults:{name:'CAB-1', conductors:1, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120, phases:3} },
   load:        { w:60,  h:80,  label:'Load',         color:'#f38ba8', titleColor:'#f38ba8',
                  defaults:{name:'LOAD-1', current:20, voltage:120, phases:1} },
   meter:       { w:70,  h:70,  label:'Meter',        color:'#b4befe', titleColor:'#b4befe',
@@ -60,7 +61,7 @@ const FIELD_DEFS = {
   {k:'name',l:'Tag'},
   {k:'size',l:'Size', t:'select', options: CABLE_DATA.map(d => d.size)}, // Changed to select
   {k:'material',l:'Material (Cu/Al)'},
-  {k:'conductors',l:'# Conductors',t:'number'},
+  {k:'conductors',l:'# Cond / Phase',t:'number'},
   {k:'insulation',l:'Insulation'},
   {k:'length',l:'Length (m)',t:'number'},
   {k:'amps',l:'Load Amps (A)',t:'number'},
@@ -950,7 +951,12 @@ function alignAllComponents() {
 // ═══════════════════════════════════════════════════
 
 function getCableRow(size) {
-  return CABLE_DATA.find(r => r.size === size) || CABLE_DATA[1];
+  const normalizedSize = String(size || '').trim();
+  const byExactMatch = CABLE_DATA.find(r => r.size === normalizedSize);
+  if (byExactMatch) return byExactMatch;
+
+  const strippedInput = normalizedSize.replace(/^#/, '');
+  return CABLE_DATA.find(r => r.size.replace(/^#/, '') === strippedInput) || CABLE_DATA[1];
 }
 
 function getConnectedNodeIds(startId) {
@@ -1014,6 +1020,7 @@ function runCableCalc() {
   const rho = mat === 'al' ? 0.0282 : 0.0172; // Ω·mm²/m
   const R = rho / A; // Ω/m
   const phases = p.phases || ((p.conductors || 1) >= 3 ? 3 : 1);
+  const conductorsPerPhase = Math.max(1, parseInt(p.conductors, 10) || 1);
   const factor = phases === 3 ? Math.sqrt(3) : 2;
   const vd = factor * I * R * L;
   const vd_pct = V > 0 ? (vd / V * 100) : 0;
@@ -1024,10 +1031,13 @@ function runCableCalc() {
   const minRowVD = CABLE_DATA.find(r => r.area >= needAreaVD) || CABLE_DATA[CABLE_DATA.length-1];
 
   const ampacity = mat === 'al' ? row.al : row.cu;
-  const ampOk = ampacity > 0 && I <= ampacity;
+  const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
+  const ampOk = totalAmpacity > 0 && I <= totalAmpacity;
+  const parallelRuns = conductorsPerPhase;
+  const requiredAmpacityPerConductor = conductorsPerPhase > 0 ? (I / conductorsPerPhase) : I;
   const minRowAmp = CABLE_DATA.find(r => {
     const cap = mat === 'al' ? r.al : r.cu;
-    return cap > 0 && cap >= I;
+    return cap > 0 && cap >= requiredAmpacityPerConductor;
   }) || CABLE_DATA[CABLE_DATA.length-1];
 
   const minRow = minRowVD.area >= minRowAmp.area ? minRowVD : minRowAmp;
@@ -1038,7 +1048,10 @@ function runCableCalc() {
   vdEl.className = 'calc-value ' + (vd_pct > 5 ? 'calc-err' : vd_pct > 3 ? 'calc-warn' : 'calc-ok');
 
   document.getElementById('cv-minsize').textContent = I > 0 ? minRow.size + ' AWG' : '—';
-  document.getElementById('cv-ampacity').textContent = ampacity > 0 ? ampacity + ' A' : 'N/A (Al <#6)';
+  document.getElementById('cv-ampacity').textContent =
+    ampacity > 0 ? `${totalAmpacity} A (${ampacity} × ${conductorsPerPhase})` : 'N/A (Al <#6)';
+  document.getElementById('cv-parallel').textContent =
+    parallelRuns > 0 ? `${parallelRuns}(${phases}${row.size})` : '—';
 
   const statEl = document.getElementById('cv-status');
   if (!ampOk && ampacity > 0) {
@@ -1209,8 +1222,10 @@ function showFeederList() {
     const factor = phases === 3 ? Math.sqrt(3) : 2;
     const vd = factor * I * R * L;
     const vd_pct = V > 0 ? (vd / V * 100) : 0;
+    const conductorsPerPhase = Math.max(1, parseInt(p.conductors, 10) || 1);
     const ampacity = mat === 'al' ? row.al : row.cu;
-    const ampOk = ampacity <= 0 || I <= ampacity;
+    const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
+    const ampOk = totalAmpacity <= 0 || I <= totalAmpacity;
     const vdClass = vd_pct > 5 ? 'badge-err' : vd_pct > 3 ? 'badge-warn' : 'badge-ok';
     const vdText = vd_pct > 5 ? 'FAIL' : vd_pct > 3 ? 'CHECK' : 'OK';
     const ampClass = ampOk ? 'badge-ok' : 'badge-err';
@@ -1224,7 +1239,7 @@ function showFeederList() {
       <td>${L} m</td>
       <td>${V} V / ${phases}Ø</td>
       <td>${I} A</td>
-      <td>${ampacity>0?ampacity+'A':'N/A'} <span class="badge ${ampClass}">${ampText}</span></td>
+      <td>${totalAmpacity>0?totalAmpacity+'A':'N/A'} <span class="badge ${ampClass}">${ampText}</span></td>
       <td>${vd.toFixed(2)}V / ${vd_pct.toFixed(2)}% <span class="badge ${vdClass}">${vdText}</span></td>
     </tr>`;
   }
@@ -1259,10 +1274,12 @@ function exportCSV() {
     const factor = phases === 3 ? Math.sqrt(3) : 2;
     const vd = factor * I * R * L;
     const vd_pct = V > 0 ? (vd / V * 100) : 0;
+    const conductorsPerPhase = Math.max(1, parseInt(p.conductors, 10) || 1);
     const ampacity = mat === 'al' ? row.al : row.cu;
-    const ampOk = ampacity <= 0 || I <= ampacity;
+    const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
+    const ampOk = totalAmpacity <= 0 || I <= totalAmpacity;
     const status = !ampOk ? 'OVERLOAD' : vd_pct > 5 ? 'VD_FAIL' : vd_pct > 3 ? 'VD_CHECK' : 'PASS';
-    csv += `${p.name||''},${from},${to},${p.conductors||1},${p.size},${mat.toUpperCase()},${p.insulation||''},${L},${V},${phases},${I},${ampacity>0?ampacity:'N/A'},${vd.toFixed(3)},${vd_pct.toFixed(2)},${status}\n`;
+    csv += `${p.name||''},${from},${to},${p.conductors||1},${p.size},${mat.toUpperCase()},${p.insulation||''},${L},${V},${phases},${I},${totalAmpacity>0?totalAmpacity:'N/A'},${vd.toFixed(3)},${vd_pct.toFixed(2)},${status}\n`;
   }
   const a = document.createElement('a');
   a.href = 'data:text/csv,' + encodeURIComponent(csv);
