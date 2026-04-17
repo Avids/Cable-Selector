@@ -33,12 +33,12 @@ const TABLE16_BONDING_DATA = [
   { max: 200, cu: '6', al: '4' },
   { max: 300, cu: '4', al: '2' },
   { max: 400, cu: '3', al: '1' },
-  { max: 500, cu: '2', al: '0' },
-  { max: 600, cu: '1', al: '00' },
-  { max: 800, cu: '0', al: '000' },
-  { max: 1000, cu: '00', al: '0000' },
-  { max: 1200, cu: '000', al: '250' },
-  { max: 1600, cu: '0000', al: '350' },
+  { max: 500, cu: '2', al: '#1/0' },
+  { max: 600, cu: '1', al: '#2/0' },
+  { max: 800, cu: '#1/0', al: '#3/0' },
+  { max: 1000, cu: '#2/0', al: '#4/0' },
+  { max: 1200, cu: '#3/0', al: '250' },
+  { max: 1600, cu: '#4/0', al: '350' },
   { max: 2000, cu: '250', al: '400' },
   { max: 2500, cu: '350', al: '500' },
   { max: 3000, cu: '400', al: '600' },
@@ -1379,6 +1379,10 @@ function showFeederList() {
     const vd_pct = V > 0 ? (vd / V * 100) : 0;
     const ampacity = mat === 'al' ? row.al : row.cu;
     const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
+    const bonding = getBondingSelectionForCable(c, {
+      totalAmpacity,
+      phaseConductorSize: p.size,
+    });
     const ampOk = totalAmpacity <= 0 || I <= totalAmpacity;
     const vdClass = vd_pct > 5 ? 'badge-err' : vd_pct > 3 ? 'badge-warn' : 'badge-ok';
     const vdText = vd_pct > 5 ? 'FAIL' : vd_pct > 3 ? 'CHECK' : 'OK';
@@ -1389,6 +1393,7 @@ function showFeederList() {
       <td>${from}</td>
       <td>${to}</td>
       <td>${p.conductors||1}C-${p.size} ${mat.toUpperCase()}</td>
+      <td>${bonding.size}</td>
       <td>${p.insulation||'—'}</td>
       <td>${L} m</td>
       <td>${system}</td>
@@ -1402,7 +1407,7 @@ function showFeederList() {
   document.getElementById('feeder-content').innerHTML = `
     <table class="feeder-table">
       <thead><tr>
-        <th>Tag</th><th>From</th><th>To</th><th>Conductor</th><th>Insulation</th>
+        <th>Tag</th><th>From</th><th>To</th><th>CONDUCTOR PER PH</th><th>BONDING WIRE</th><th>Insulation</th>
         <th>Length</th><th>System</th><th>Voltage / Phase</th><th>Load</th>
         <th>Ampacity</th><th>Voltage Drop</th>
       </tr></thead>
