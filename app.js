@@ -1407,7 +1407,7 @@ function showFeederList() {
   document.getElementById('feeder-content').innerHTML = `
     <table class="feeder-table">
       <thead><tr>
-        <th>Tag</th><th>From</th><th>To</th><th>Conductor</th><th>Bonding Conductor (Table 16)</th><th>Insulation</th>
+        <th>Tag</th><th>From</th><th>To</th><th>CONDUCTOR PER PH</th><th>BONDING WIRE</th><th>Insulation</th>
         <th>Length</th><th>System</th><th>Voltage / Phase</th><th>Load</th>
         <th>Ampacity</th><th>Voltage Drop</th>
       </tr></thead>
