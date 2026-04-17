@@ -1025,6 +1025,8 @@ function runCableCalc() {
 
   const ampacity = mat === 'al' ? row.al : row.cu;
   const ampOk = ampacity > 0 && I <= ampacity;
+  const parallelRuns = ampacity > 0 && I > 0 ? Math.max(1, Math.ceil(I / ampacity)) : 0;
+  const effectiveAmpacity = parallelRuns > 0 ? ampacity * parallelRuns : 0;
   const minRowAmp = CABLE_DATA.find(r => {
     const cap = mat === 'al' ? r.al : r.cu;
     return cap > 0 && cap >= I;
@@ -1039,6 +1041,10 @@ function runCableCalc() {
 
   document.getElementById('cv-minsize').textContent = I > 0 ? minRow.size + ' AWG' : '—';
   document.getElementById('cv-ampacity').textContent = ampacity > 0 ? ampacity + ' A' : 'N/A (Al <#6)';
+  document.getElementById('cv-parallel').textContent =
+    parallelRuns > 0 ? `${parallelRuns} run${parallelRuns > 1 ? 's' : ''} (${effectiveAmpacity} A total)` : 'N/A';
+  document.getElementById('cv-parallelfmt').textContent =
+    parallelRuns > 0 ? `${parallelRuns}(${p.conductors || 1}#${p.size})` : '—';
 
   const statEl = document.getElementById('cv-status');
   if (!ampOk && ampacity > 0) {
