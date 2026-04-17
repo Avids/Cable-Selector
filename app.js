@@ -28,6 +28,13 @@ const TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS = [480, 208];
 const TRANSFORMER_KVA_OPTIONS = [3, 6, 9, 15, 30, 45, 75, 100, 112.5, 150, 225, 300, 450, 500, 600];
 const SYSTEM_VOLTAGE_OPTIONS = [600, 480, 347, 240, 208, 120];
 const PHASE_OPTIONS = [1, 3];
+const SYSTEM_TYPE_OPTIONS = ['1ph/2w', '1ph/3w', '3ph/3w', '3ph/4w'];
+const SYSTEM_CONFIG = {
+  '1ph/2w': { phases: 1, hots: 1, neutrals: 1 },
+  '1ph/3w': { phases: 1, hots: 2, neutrals: 1 },
+  '3ph/3w': { phases: 3, hots: 3, neutrals: 0 },
+  '3ph/4w': { phases: 3, hots: 4, neutrals: 1 },
+};
 
 const COMP_DEFS = {
   utility:     { w:80,  h:80,  label:'Utility',      color:'#89b4fa', titleColor:'#89b4fa',
@@ -35,7 +42,7 @@ const COMP_DEFS = {
   transformer: { w:80,  h:90,  label:'Transformer',  color:'#cba6f7', titleColor:'#cba6f7',
                  defaults:{name:'TX-1', kva:75, primary_v:600, secondary_v:208, phases:3, impedance:4.5, conn:'Delta-Wye'} },
   panel:       { w:90,  h:80,  label:'Panel',        color:'#94e2d5', titleColor:'#94e2d5',
-                 defaults:{name:'MDP', voltage:120, phases:3, main_amps:200, short_ckt_kA:10, mfr:'Square D'} },
+                 defaults:{name:'MDP', voltage:120, system:'3ph/4w', main_amps:200, short_ckt_kA:10, mfr:'Square D'} },
   breaker:     { w:60,  h:80,  label:'Breaker',      color:'#74c7ec', titleColor:'#74c7ec',
                  defaults:{name:'CB-1', amps:20, poles:1, voltage:120, phases:1, kaic:10, type:'Thermal-Mag', mfr:'Square D'} },
   fuse:        { w:60,  h:80,  label:'Fuse Disc.',   color:'#fab387', titleColor:'#fab387',
@@ -43,7 +50,7 @@ const COMP_DEFS = {
   bus:         { w:110, h:50,  label:'Bus Bar',      color:'#f9e2af', titleColor:'#f9e2af',
                  defaults:{name:'BUS-1', voltage:120, amps:400, phases:3} },
   cable:       { w:90,  h:60,  label:'Cable',        color:'#a6e3a1', titleColor:'#a6e3a1',
-                 defaults:{name:'CAB-1', conductors:1, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120, phases:3} },
+                 defaults:{name:'CAB-1', conductors:1, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120, system:'3ph/4w'} },
   load:        { w:60,  h:80,  label:'Load',         color:'#f38ba8', titleColor:'#f38ba8',
                  defaults:{name:'LOAD-1', current:20, voltage:120, phases:1} },
   meter:       { w:70,  h:70,  label:'Meter',        color:'#b4befe', titleColor:'#b4befe',
@@ -53,7 +60,7 @@ const COMP_DEFS = {
 const FIELD_DEFS = {
   utility:     [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'fault_kA',l:'Fault (kA)',t:'number'}],
   transformer: [{k:'name',l:'Tag'},{k:'kva',l:'KVA',t:'select',options:TRANSFORMER_KVA_OPTIONS},{k:'primary_v',l:'Primary V',t:'select',options:TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS},{k:'secondary_v',l:'Secondary V',t:'select',options:TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
-  panel:       [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'main_amps',l:'Main Amps',t:'number'},{k:'short_ckt_kA',l:'SCCR (kA)',t:'number'},{k:'mfr',l:'Manufacturer'}],
+  panel:       [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'system',l:'System',t:'select',options:SYSTEM_TYPE_OPTIONS},{k:'main_amps',l:'Main Amps',t:'number'},{k:'short_ckt_kA',l:'SCCR (kA)',t:'number'},{k:'mfr',l:'Manufacturer'}],
   breaker:     [{k:'name',l:'Tag'},{k:'amps',l:'Trip (A)',t:'number'},{k:'poles',l:'Poles',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'kaic',l:'kAIC',t:'number'},{k:'type',l:'Trip Type'},{k:'mfr',l:'Manufacturer'}],
   fuse:        [{k:'name',l:'Tag'},{k:'amps',l:'Rating (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'fuse_class',l:'Fuse Class'},{k:'poles',l:'Poles',t:'number'}],
   bus:         [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'amps',l:'Ampacity (A)',t:'number'},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS}],
@@ -66,7 +73,7 @@ const FIELD_DEFS = {
   {k:'length',l:'Length (m)',t:'number'},
   {k:'amps',l:'Load Amps (A)',t:'number'},
   {k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},
-  {k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS}
+  {k:'system',l:'System',t:'select',options:SYSTEM_TYPE_OPTIONS}
 ],
   load:        [{k:'name',l:'Tag'},{k:'current',l:'Current (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS}],
   meter:       [{k:'name',l:'Tag'},{k:'type',l:'Type'},{k:'ct_ratio',l:'CT Ratio'},{k:'voltage',l:'Voltage (V)',t:'number'}],
@@ -382,11 +389,11 @@ function getEngineeringMeta(n) {
   switch (n.type) {
     case 'utility': return [`${n.props.voltage || '—'}V`, `${n.props.phases || '—'}PH`];
     case 'transformer': return [`${n.props.kva || '—'}kVA`, `${n.props.primary_v || '—'}/${n.props.secondary_v || '—'}V`];
-    case 'panel': return [`MAIN ${n.props.main_amps || '—'}A`, `${n.props.short_ckt_kA || '—'}kA SCCR`];
+    case 'panel': return [`MAIN ${n.props.main_amps || '—'}A`, `${n.props.system || '—'} / ${n.props.short_ckt_kA || '—'}kA SCCR`];
     case 'breaker': return [`CB ${n.props.amps || '—'}A`, `${n.props.poles || '—'}P`];
     case 'fuse': return [`FD ${n.props.amps || '—'}A`, `CLASS ${n.props.fuse_class || '—'}`];
     case 'bus': return [`BUS ${n.props.amps || '—'}A`, `${n.props.voltage || '—'}V`];
-    case 'cable': return [`${n.props.conductors || '—'}C ${n.props.size || '—'}`, `${n.props.length || '—'}m`];
+    case 'cable': return [`${n.props.conductors || '—'}C ${n.props.size || '—'}`, `${n.props.system || '—'} / ${n.props.length || '—'}m`];
     case 'load': return [`${n.props.current || '—'}A`, `${n.props.voltage || '—'}V`];
     case 'meter': return [`${n.props.type || '—'}`, `${n.props.ct_ratio || '—'}`];
     default: return [];
@@ -399,6 +406,12 @@ function drawCanvasBackdrop() {
   ctx.fillStyle = '#e9e9e9';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
+}
+
+function getSystemPhaseCount(system, fallbackPhases = 1) {
+  const cfg = SYSTEM_CONFIG[system];
+  if (cfg) return cfg.phases;
+  return fallbackPhases || 1;
 }
 
 function drawSymbol(ctx, type, x, y, w, h, zoom) {
@@ -808,6 +821,9 @@ function updateProp(input) {
   if (!n) return;
   const numKeys = ['voltage','phases','amps','current','kva','primary_v','secondary_v','impedance','main_amps','short_ckt_kA','kaic','poles','fault_kA','kw','hp','pf','length','conductors'];
   n.props[key] = numKeys.includes(key) ? parseFloat(input.value) || 0 : input.value;
+  if (key === 'system' && (n.type === 'panel' || n.type === 'cable')) {
+    n.props.phases = getSystemPhaseCount(n.props.system, n.props.phases);
+  }
   if (n.type === 'transformer') syncCableVoltages();
   draw();
   if (n.type === 'cable') runCableCalc();
@@ -1019,35 +1035,22 @@ function runCableCalc() {
   const A = row.area;
   const rho = mat === 'al' ? 0.0282 : 0.0172; // Ω·mm²/m
   const R = rho / A; // Ω/m
-  const phases = p.phases || ((p.conductors || 1) >= 3 ? 3 : 1);
+  const phases = getSystemPhaseCount(p.system, p.phases || ((p.conductors || 1) >= 3 ? 3 : 1));
   const conductorsPerPhase = Math.max(1, parseInt(p.conductors, 10) || 1);
   const factor = phases === 3 ? Math.sqrt(3) : 2;
-  const vd = factor * I * R * L;
+  const vd = (factor * I * R * L) / conductorsPerPhase;
   const vd_pct = V > 0 ? (vd / V * 100) : 0;
-
-  // Min size must satisfy both 3% VD and ampacity.
-  const vd_limit = V * 0.03;
-  const needAreaVD = vd_limit > 0 ? (factor * I * rho * L) / vd_limit : 0;
-  const minRowVD = CABLE_DATA.find(r => r.area >= needAreaVD) || CABLE_DATA[CABLE_DATA.length-1];
 
   const ampacity = mat === 'al' ? row.al : row.cu;
   const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
   const ampOk = totalAmpacity > 0 && I <= totalAmpacity;
   const parallelRuns = conductorsPerPhase;
-  const requiredAmpacityPerConductor = conductorsPerPhase > 0 ? (I / conductorsPerPhase) : I;
-  const minRowAmp = CABLE_DATA.find(r => {
-    const cap = mat === 'al' ? r.al : r.cu;
-    return cap > 0 && cap >= requiredAmpacityPerConductor;
-  }) || CABLE_DATA[CABLE_DATA.length-1];
-
-  const minRow = minRowVD.area >= minRowAmp.area ? minRowVD : minRowAmp;
 
   document.getElementById('cv-vd').textContent = vd.toFixed(2) + ' V';
   const vdEl = document.getElementById('cv-vdpct');
   vdEl.textContent = vd_pct.toFixed(2) + '%';
   vdEl.className = 'calc-value ' + (vd_pct > 5 ? 'calc-err' : vd_pct > 3 ? 'calc-warn' : 'calc-ok');
 
-  document.getElementById('cv-minsize').textContent = I > 0 ? minRow.size + ' AWG' : '—';
   document.getElementById('cv-ampacity').textContent =
     ampacity > 0 ? `${totalAmpacity} A (${ampacity} × ${conductorsPerPhase})` : 'N/A (Al <#6)';
   document.getElementById('cv-parallel').textContent =
@@ -1218,11 +1221,12 @@ function showFeederList() {
     const A = row.area;
     const rho = mat === 'al' ? 0.0282 : 0.0172;
     const R = rho / A;
-    const phases = p.phases || ((p.conductors || 1) >= 3 ? 3 : 1);
+    const phases = getSystemPhaseCount(p.system, p.phases || ((p.conductors || 1) >= 3 ? 3 : 1));
+    const system = p.system || '—';
     const factor = phases === 3 ? Math.sqrt(3) : 2;
-    const vd = factor * I * R * L;
-    const vd_pct = V > 0 ? (vd / V * 100) : 0;
     const conductorsPerPhase = Math.max(1, parseInt(p.conductors, 10) || 1);
+    const vd = (factor * I * R * L) / conductorsPerPhase;
+    const vd_pct = V > 0 ? (vd / V * 100) : 0;
     const ampacity = mat === 'al' ? row.al : row.cu;
     const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
     const ampOk = totalAmpacity <= 0 || I <= totalAmpacity;
@@ -1237,6 +1241,7 @@ function showFeederList() {
       <td>${p.conductors||1}C-${p.size} ${mat.toUpperCase()}</td>
       <td>${p.insulation||'—'}</td>
       <td>${L} m</td>
+      <td>${system}</td>
       <td>${V} V / ${phases}Ø</td>
       <td>${I} A</td>
       <td>${totalAmpacity>0?totalAmpacity+'A':'N/A'} <span class="badge ${ampClass}">${ampText}</span></td>
@@ -1248,7 +1253,7 @@ function showFeederList() {
     <table class="feeder-table">
       <thead><tr>
         <th>Tag</th><th>From</th><th>To</th><th>Conductor</th><th>Insulation</th>
-        <th>Length</th><th>Voltage / Phase</th><th>Load</th>
+        <th>Length</th><th>System</th><th>Voltage / Phase</th><th>Load</th>
         <th>Ampacity</th><th>Voltage Drop</th>
       </tr></thead>
       <tbody>${rows}</tbody>
@@ -1258,7 +1263,7 @@ function showFeederList() {
 
 function exportCSV() {
   const cables = nodes.filter(n => n.type === 'cable');
-  let csv = 'Tag,From,To,Conductors,Size,Material,Insulation,Length(m),Voltage(V),Phases,Load(A),Ampacity(A),VD(V),VD(%),Status\n';
+  let csv = 'Tag,From,To,Conductors,Size,Material,Insulation,Length(m),System,Voltage(V),Phases,Load(A),Ampacity(A),VD(V),VD(%),Status\n';
   for (const c of cables) {
     const p = c.props;
     const { from, to } = getCableEndpoints(c);
@@ -1270,16 +1275,17 @@ function exportCSV() {
     const A = row.area;
     const rho = mat === 'al' ? 0.0282 : 0.0172;
     const R = rho / A;
-    const phases = p.phases || ((p.conductors || 1) >= 3 ? 3 : 1);
+    const phases = getSystemPhaseCount(p.system, p.phases || ((p.conductors || 1) >= 3 ? 3 : 1));
+    const system = p.system || '';
     const factor = phases === 3 ? Math.sqrt(3) : 2;
-    const vd = factor * I * R * L;
-    const vd_pct = V > 0 ? (vd / V * 100) : 0;
     const conductorsPerPhase = Math.max(1, parseInt(p.conductors, 10) || 1);
+    const vd = (factor * I * R * L) / conductorsPerPhase;
+    const vd_pct = V > 0 ? (vd / V * 100) : 0;
     const ampacity = mat === 'al' ? row.al : row.cu;
     const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
     const ampOk = totalAmpacity <= 0 || I <= totalAmpacity;
     const status = !ampOk ? 'OVERLOAD' : vd_pct > 5 ? 'VD_FAIL' : vd_pct > 3 ? 'VD_CHECK' : 'PASS';
-    csv += `${p.name||''},${from},${to},${p.conductors||1},${p.size},${mat.toUpperCase()},${p.insulation||''},${L},${V},${phases},${I},${totalAmpacity>0?totalAmpacity:'N/A'},${vd.toFixed(3)},${vd_pct.toFixed(2)},${status}\n`;
+    csv += `${p.name||''},${from},${to},${p.conductors||1},${p.size},${mat.toUpperCase()},${p.insulation||''},${L},${system},${V},${phases},${I},${totalAmpacity>0?totalAmpacity:'N/A'},${vd.toFixed(3)},${vd_pct.toFixed(2)},${status}\n`;
   }
   const a = document.createElement('a');
   a.href = 'data:text/csv,' + encodeURIComponent(csv);
