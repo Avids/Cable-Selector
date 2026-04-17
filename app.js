@@ -23,25 +23,55 @@ const CABLE_DATA = [
   {size:'#600', area:304.0, cu:355, al:285 },
 ];
 
-// CSA C22.1:24 Table 16 — Bonding conductor size lookup.
-// NOTE: values are selected by upper ampere boundary only; no interpolation is performed.
+// CSA C22.1:24 Table 16 — Bonding conductor size lookup ("Not exceeding" column).
+// Selection is step-based: choose first row where reference amps <= row.max.
 const TABLE16_BONDING_DATA = [
-  { max: 15, cu: '#14', al: '#12' },
-  { max: 20, cu: '#12', al: '#10' },
-  { max: 60, cu: '#10', al: '#8' },
-  { max: 100, cu: '#8', al: '#6' },
-  { max: 200, cu: '#6', al: '#4' },
-  { max: 400, cu: '#3', al: '#1' },
-  { max: 600, cu: '#1', al: '1/0' },
-  { max: 800, cu: '1/0', al: '2/0' },
-  { max: 1000, cu: '2/0', al: '3/0' },
-  { max: 1200, cu: '3/0', al: '4/0' },
-  { max: 1600, cu: '4/0', al: '#250' },
-  { max: 2000, cu: '#250', al: '#350' },
-  { max: 2500, cu: '#350', al: '#400' },
-  { max: 3000, cu: '#400', al: '#500' },
-  { max: 4000, cu: '#500', al: '#600' },
+  { max: 20, cu: '14', al: '12' },
+  { max: 30, cu: '12', al: '10' },
+  { max: 60, cu: '10', al: '8' },
+  { max: 100, cu: '8', al: '6' },
+  { max: 200, cu: '6', al: '4' },
+  { max: 300, cu: '4', al: '2' },
+  { max: 400, cu: '3', al: '1' },
+  { max: 500, cu: '2', al: '0' },
+  { max: 600, cu: '1', al: '00' },
+  { max: 800, cu: '0', al: '000' },
+  { max: 1000, cu: '00', al: '0000' },
+  { max: 1200, cu: '000', al: '250' },
+  { max: 1600, cu: '0000', al: '350' },
+  { max: 2000, cu: '250', al: '400' },
+  { max: 2500, cu: '350', al: '500' },
+  { max: 3000, cu: '400', al: '600' },
+  { max: 4000, cu: '500', al: '800' },
+  { max: 5000, cu: '700', al: '1000' },
+  { max: 6000, cu: '800', al: '1250' },
 ];
+
+const CONDUCTOR_AREA_MM2 = {
+  '14': 2.08,
+  '12': 3.31,
+  '10': 5.26,
+  '8': 8.37,
+  '6': 13.3,
+  '4': 21.1,
+  '3': 26.7,
+  '2': 33.6,
+  '1': 42.4,
+  '0': 53.5,
+  '00': 67.4,
+  '000': 85.0,
+  '0000': 107.0,
+  '250': 127.0,
+  '300': 152.0,
+  '350': 177.0,
+  '400': 203.0,
+  '500': 253.0,
+  '600': 304.0,
+  '700': 355.0,
+  '800': 405.5,
+  '1000': 507.0,
+  '1250': 633.5,
+};
 
 const BONDING_SCOPE_OPTIONS = ['Service Equipment', 'Feeder', 'Branch Circuit'];
 const BONDING_METHOD_OPTIONS = ['Overcurrent Device', 'Largest Ungrounded (VD Increased)'];
@@ -1111,23 +1141,45 @@ function runCableCalc() {
 }
 
 function getCableAreaBySize(size) {
+  const normalized = normalizeConductorSizeToken(size);
+  if (normalized && CONDUCTOR_AREA_MM2[normalized]) return CONDUCTOR_AREA_MM2[normalized];
   const row = getCableRow(size);
   return row?.area || 0;
+}
+
+function normalizeConductorSizeToken(size) {
+  let token = String(size || '').trim().toUpperCase();
+  if (!token) return '';
+  token = token.replace(/^#/, '');
+  if (token === '1/0') return '0';
+  if (token === '2/0') return '00';
+  if (token === '3/0') return '000';
+  if (token === '4/0') return '0000';
+  return token;
+}
+
+function formatConductorSizeToken(size) {
+  const token = normalizeConductorSizeToken(size);
+  if (!token) return 'N/A';
+  if (/^[0]{1,4}$/.test(token)) return token;
+  if (/^\d+$/.test(token) && Number(token) < 250) return `#${token}`;
+  return token;
 }
 
 function getTable16BondingSize(referenceAmps, bondingMaterial) {
   if (!Number.isFinite(referenceAmps) || referenceAmps <= 0) return null;
   const tableRow = TABLE16_BONDING_DATA.find(entry => referenceAmps <= entry.max);
   if (!tableRow) return null;
-  return String(bondingMaterial || 'Cu').toLowerCase().startsWith('al') ? tableRow.al : tableRow.cu;
+  const rawSize = String(bondingMaterial || 'Cu').toLowerCase().startsWith('al') ? tableRow.al : tableRow.cu;
+  return normalizeConductorSizeToken(rawSize);
 }
 
 function enforceRule106165MaxBondingSize(calculatedSize, phaseConductorSize) {
-  if (!calculatedSize || !phaseConductorSize) return calculatedSize || 'N/A';
+  if (!calculatedSize || !phaseConductorSize) return calculatedSize || null;
   const bondingArea = getCableAreaBySize(calculatedSize);
   const phaseArea = getCableAreaBySize(phaseConductorSize);
   if (bondingArea <= 0 || phaseArea <= 0) return calculatedSize;
-  return bondingArea > phaseArea ? phaseConductorSize : calculatedSize;
+  return bondingArea > phaseArea ? normalizeConductorSizeToken(phaseConductorSize) : calculatedSize;
 }
 
 function getBondingSelectionForCable(cableNode, context) {
@@ -1160,7 +1212,7 @@ function getBondingSelectionForCable(cableNode, context) {
 
   const table16Size = getTable16BondingSize(referenceAmps, bondingMaterial);
   const cappedSize = enforceRule106165MaxBondingSize(table16Size, context.phaseConductorSize);
-  const size = cappedSize || 'N/A (outside Table 16 range)';
+  const size = cappedSize ? formatConductorSizeToken(cappedSize) : 'N/A (outside Table 16 range)';
 
   // Rule 10-616(4) intentionally disregarded per project requirement:
   // no splitting/dividing by parallel raceways; sizing is performed as a full standalone conductor.
