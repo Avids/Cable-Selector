@@ -1222,8 +1222,10 @@ function showFeederList() {
     const factor = phases === 3 ? Math.sqrt(3) : 2;
     const vd = factor * I * R * L;
     const vd_pct = V > 0 ? (vd / V * 100) : 0;
+    const conductorsPerPhase = Math.max(1, parseInt(p.conductors, 10) || 1);
     const ampacity = mat === 'al' ? row.al : row.cu;
-    const ampOk = ampacity <= 0 || I <= ampacity;
+    const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
+    const ampOk = totalAmpacity <= 0 || I <= totalAmpacity;
     const vdClass = vd_pct > 5 ? 'badge-err' : vd_pct > 3 ? 'badge-warn' : 'badge-ok';
     const vdText = vd_pct > 5 ? 'FAIL' : vd_pct > 3 ? 'CHECK' : 'OK';
     const ampClass = ampOk ? 'badge-ok' : 'badge-err';
@@ -1237,7 +1239,7 @@ function showFeederList() {
       <td>${L} m</td>
       <td>${V} V / ${phases}Ø</td>
       <td>${I} A</td>
-      <td>${ampacity>0?ampacity+'A':'N/A'} <span class="badge ${ampClass}">${ampText}</span></td>
+      <td>${totalAmpacity>0?totalAmpacity+'A':'N/A'} <span class="badge ${ampClass}">${ampText}</span></td>
       <td>${vd.toFixed(2)}V / ${vd_pct.toFixed(2)}% <span class="badge ${vdClass}">${vdText}</span></td>
     </tr>`;
   }
@@ -1272,10 +1274,12 @@ function exportCSV() {
     const factor = phases === 3 ? Math.sqrt(3) : 2;
     const vd = factor * I * R * L;
     const vd_pct = V > 0 ? (vd / V * 100) : 0;
+    const conductorsPerPhase = Math.max(1, parseInt(p.conductors, 10) || 1);
     const ampacity = mat === 'al' ? row.al : row.cu;
-    const ampOk = ampacity <= 0 || I <= ampacity;
+    const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
+    const ampOk = totalAmpacity <= 0 || I <= totalAmpacity;
     const status = !ampOk ? 'OVERLOAD' : vd_pct > 5 ? 'VD_FAIL' : vd_pct > 3 ? 'VD_CHECK' : 'PASS';
-    csv += `${p.name||''},${from},${to},${p.conductors||1},${p.size},${mat.toUpperCase()},${p.insulation||''},${L},${V},${phases},${I},${ampacity>0?ampacity:'N/A'},${vd.toFixed(3)},${vd_pct.toFixed(2)},${status}\n`;
+    csv += `${p.name||''},${from},${to},${p.conductors||1},${p.size},${mat.toUpperCase()},${p.insulation||''},${L},${V},${phases},${I},${totalAmpacity>0?totalAmpacity:'N/A'},${vd.toFixed(3)},${vd_pct.toFixed(2)},${status}\n`;
   }
   const a = document.createElement('a');
   a.href = 'data:text/csv,' + encodeURIComponent(csv);
