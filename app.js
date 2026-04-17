@@ -15,11 +15,12 @@ const CABLE_DATA = [
   {size:'2/0', area:67.4,  cu:145, al:115 },
   {size:'3/0', area:85.0,  cu:165, al:130 },
   {size:'4/0', area:107.0, cu:195, al:150 },
-  {size:'250', area:127.0, cu:215, al:170 },
-  {size:'300', area:152.0, cu:240, al:190 },
-  {size:'350', area:177.0, cu:260, al:210 },
-  {size:'400', area:203.0, cu:280, al:225 },
-  {size:'500', area:253.0, cu:320, al:260 },
+  {size:'#250', area:127.0, cu:215, al:170 },
+  {size:'#300', area:152.0, cu:240, al:190 },
+  {size:'#350', area:177.0, cu:260, al:210 },
+  {size:'#400', area:203.0, cu:280, al:225 },
+  {size:'#500', area:253.0, cu:320, al:260 },
+  {size:'#600', area:304.0, cu:355, al:285 },
 ];
 
 const TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS = [600, 480, 208];
@@ -950,7 +951,12 @@ function alignAllComponents() {
 // ═══════════════════════════════════════════════════
 
 function getCableRow(size) {
-  return CABLE_DATA.find(r => r.size === size) || CABLE_DATA[1];
+  const normalizedSize = String(size || '').trim();
+  const byExactMatch = CABLE_DATA.find(r => r.size === normalizedSize);
+  if (byExactMatch) return byExactMatch;
+
+  const strippedInput = normalizedSize.replace(/^#/, '');
+  return CABLE_DATA.find(r => r.size.replace(/^#/, '') === strippedInput) || CABLE_DATA[1];
 }
 
 function getConnectedNodeIds(startId) {
@@ -1025,8 +1031,9 @@ function runCableCalc() {
   const minRowVD = CABLE_DATA.find(r => r.area >= needAreaVD) || CABLE_DATA[CABLE_DATA.length-1];
 
   const ampacity = mat === 'al' ? row.al : row.cu;
-  const ampOk = ampacity > 0 && I <= ampacity;
-  const parallelRuns = ampacity > 0 && I > 0 ? Math.max(1, Math.ceil(I / ampacity)) : 0;
+  const parallelAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
+  const ampOk = parallelAmpacity > 0 && I <= parallelAmpacity;
+  const parallelRuns = parallelAmpacity > 0 && I > 0 ? Math.max(1, Math.ceil(I / parallelAmpacity)) : 0;
   const minRowAmp = CABLE_DATA.find(r => {
     const cap = mat === 'al' ? r.al : r.cu;
     return cap > 0 && cap >= I;
@@ -1042,7 +1049,7 @@ function runCableCalc() {
   document.getElementById('cv-minsize').textContent = I > 0 ? minRow.size + ' AWG' : '—';
   document.getElementById('cv-ampacity').textContent = ampacity > 0 ? ampacity + ' A' : 'N/A (Al <#6)';
   document.getElementById('cv-parallel').textContent =
-    parallelRuns > 0 ? `${parallelRuns}(${conductorsPerPhase}#${p.size})` : '—';
+    parallelRuns > 0 ? `${parallelRuns}(${phases}${row.size})` : '—';
 
   const statEl = document.getElementById('cv-status');
   if (!ampOk && ampacity > 0) {
