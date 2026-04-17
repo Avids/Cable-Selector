@@ -11,10 +11,10 @@ const CABLE_DATA = [
   {size:'#4',  area:21.1,  cu:70,  al:55  },
   {size:'#2',  area:33.6,  cu:95,  al:75  },
   {size:'#1',  area:42.4,  cu:110, al:85  },
-  {size:'1/0', area:53.5,  cu:125, al:100 },
-  {size:'2/0', area:67.4,  cu:145, al:115 },
-  {size:'3/0', area:85.0,  cu:165, al:130 },
-  {size:'4/0', area:107.0, cu:195, al:150 },
+  {size:'#1/0', area:53.5,  cu:125, al:100 },
+  {size:'#2/0', area:67.4,  cu:145, al:115 },
+  {size:'#3/0', area:85.0,  cu:165, al:130 },
+  {size:'#4/0', area:107.0, cu:195, al:150 },
   {size:'#250', area:127.0, cu:215, al:170 },
   {size:'#300', area:152.0, cu:240, al:190 },
   {size:'#350', area:177.0, cu:260, al:210 },
@@ -1161,7 +1161,10 @@ function normalizeConductorSizeToken(size) {
 function formatConductorSizeToken(size) {
   const token = normalizeConductorSizeToken(size);
   if (!token) return 'N/A';
-  if (/^[0]{1,4}$/.test(token)) return token;
+  if (token === '0') return '#1/0';
+  if (token === '00') return '#2/0';
+  if (token === '000') return '#3/0';
+  if (token === '0000') return '#4/0';
   if (/^\d+$/.test(token) && Number(token) < 250) return `#${token}`;
   return token;
 }
