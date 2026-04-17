@@ -116,6 +116,13 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
+window.addEventListener('beforeunload', (event) => {
+  const hasProjectData = nodes.length > 0 || wires.length > 0;
+  if (!hasProjectData) return;
+
+  event.preventDefault();
+  event.returnValue = 'ARE YOU SURE you want to close this window? Save the project first.';
+});
 
 // ═══════════════════════════════════════════════════
 // COORDINATE HELPERS
