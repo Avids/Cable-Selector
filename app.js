@@ -44,7 +44,7 @@ const COMP_DEFS = {
   panel:       { w:90,  h:80,  label:'Panel',        color:'#94e2d5', titleColor:'#94e2d5',
                  defaults:{name:'MDP', voltage:120, system:'3ph/4w', main_amps:200, short_ckt_kA:10, mfr:'Square D'} },
   breaker:     { w:60,  h:80,  label:'Breaker',      color:'#74c7ec', titleColor:'#74c7ec',
-                 defaults:{name:'CB-1', amps:20, poles:1, voltage:120, phases:1, kaic:10, type:'Thermal-Mag', mfr:'Square D'} },
+                 defaults:{name:'CB-1', amps:20, voltage:120, system:'1ph/2w', kaic:10, mfr:'Square D'} },
   fuse:        { w:60,  h:80,  label:'Fuse Disc.',   color:'#fab387', titleColor:'#fab387',
                  defaults:{name:'FD-1', amps:30, voltage:600, phases:3, fuse_class:'RK5', poles:3} },
   bus:         { w:110, h:50,  label:'Bus Bar',      color:'#f9e2af', titleColor:'#f9e2af',
@@ -61,7 +61,7 @@ const FIELD_DEFS = {
   utility:     [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'fault_kA',l:'Fault (kA)',t:'number'}],
   transformer: [{k:'name',l:'Tag'},{k:'kva',l:'KVA',t:'select',options:TRANSFORMER_KVA_OPTIONS},{k:'primary_v',l:'Primary V',t:'select',options:TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS},{k:'secondary_v',l:'Secondary V',t:'select',options:TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
   panel:       [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'system',l:'System',t:'select',options:SYSTEM_TYPE_OPTIONS},{k:'main_amps',l:'Main Amps',t:'number'},{k:'short_ckt_kA',l:'SCCR (kA)',t:'number'},{k:'mfr',l:'Manufacturer'}],
-  breaker:     [{k:'name',l:'Tag'},{k:'amps',l:'Trip (A)',t:'number'},{k:'poles',l:'Poles',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'kaic',l:'kAIC',t:'number'},{k:'type',l:'Trip Type'},{k:'mfr',l:'Manufacturer'}],
+  breaker:     [{k:'name',l:'Tag'},{k:'amps',l:'Trip (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'system',l:'System',t:'select',options:SYSTEM_TYPE_OPTIONS},{k:'kaic',l:'kAIC',t:'number'},{k:'mfr',l:'Manufacturer'}],
   fuse:        [{k:'name',l:'Tag'},{k:'amps',l:'Rating (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'fuse_class',l:'Fuse Class'},{k:'poles',l:'Poles',t:'number'}],
   bus:         [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'amps',l:'Ampacity (A)',t:'number'},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS}],
   cable: [
@@ -390,7 +390,7 @@ function getEngineeringMeta(n) {
     case 'utility': return [`${n.props.voltage || '—'}V`, `${n.props.phases || '—'}PH`];
     case 'transformer': return [`${n.props.kva || '—'}kVA`, `${n.props.primary_v || '—'}/${n.props.secondary_v || '—'}V`];
     case 'panel': return [`MAIN ${n.props.main_amps || '—'}A`, `${n.props.system || '—'} / ${n.props.short_ckt_kA || '—'}kA SCCR`];
-    case 'breaker': return [`CB ${n.props.amps || '—'}A`, `${n.props.poles || '—'}P`];
+    case 'breaker': return [`CB ${n.props.amps || '—'}A`, `${n.props.system || '—'}`];
     case 'fuse': return [`FD ${n.props.amps || '—'}A`, `CLASS ${n.props.fuse_class || '—'}`];
     case 'bus': return [`BUS ${n.props.amps || '—'}A`, `${n.props.voltage || '—'}V`];
     case 'cable': return [`${n.props.conductors || '—'}C ${n.props.size || '—'}`, `${n.props.system || '—'} / ${n.props.length || '—'}m`];
@@ -535,6 +535,9 @@ function dropComp(e) {
     y: Math.round((y - d.h/2) / 10) * 10,
     props: Object.assign({}, d.defaults),
   };
+  if (node.props.system) {
+    node.props.phases = getSystemPhaseCount(node.props.system, node.props.phases);
+  }
   
   nodes.push(node);
   select(node);
@@ -819,9 +822,9 @@ function updateProp(input) {
   const key = input.dataset.key;
   const n = nodes.find(n => n.id === nid);
   if (!n) return;
-  const numKeys = ['voltage','phases','amps','current','kva','primary_v','secondary_v','impedance','main_amps','short_ckt_kA','kaic','poles','fault_kA','kw','hp','pf','length','conductors'];
+  const numKeys = ['voltage','phases','amps','current','kva','primary_v','secondary_v','impedance','main_amps','short_ckt_kA','kaic','fault_kA','kw','hp','pf','length','conductors'];
   n.props[key] = numKeys.includes(key) ? parseFloat(input.value) || 0 : input.value;
-  if (key === 'system' && (n.type === 'panel' || n.type === 'cable')) {
+  if (key === 'system' && (n.type === 'panel' || n.type === 'cable' || n.type === 'breaker')) {
     n.props.phases = getSystemPhaseCount(n.props.system, n.props.phases);
   }
   if (n.type === 'transformer') syncCableVoltages();
