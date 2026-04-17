@@ -43,7 +43,7 @@ const COMP_DEFS = {
   bus:         { w:110, h:50,  label:'Bus Bar',      color:'#f9e2af', titleColor:'#f9e2af',
                  defaults:{name:'BUS-1', voltage:120, amps:400, phases:3} },
   cable:       { w:90,  h:60,  label:'Cable',        color:'#a6e3a1', titleColor:'#a6e3a1',
-                 defaults:{name:'CAB-1', conductors:3, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120, phases:3} },
+                 defaults:{name:'CAB-1', conductors:1, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120, phases:3} },
   load:        { w:60,  h:80,  label:'Load',         color:'#f38ba8', titleColor:'#f38ba8',
                  defaults:{name:'LOAD-1', current:20, voltage:120, phases:1} },
   meter:       { w:70,  h:70,  label:'Meter',        color:'#b4befe', titleColor:'#b4befe',
@@ -1031,12 +1031,13 @@ function runCableCalc() {
   const minRowVD = CABLE_DATA.find(r => r.area >= needAreaVD) || CABLE_DATA[CABLE_DATA.length-1];
 
   const ampacity = mat === 'al' ? row.al : row.cu;
-  const parallelAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
-  const ampOk = parallelAmpacity > 0 && I <= parallelAmpacity;
-  const parallelRuns = parallelAmpacity > 0 && I > 0 ? Math.max(1, Math.ceil(I / parallelAmpacity)) : 0;
+  const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
+  const ampOk = totalAmpacity > 0 && I <= totalAmpacity;
+  const parallelRuns = conductorsPerPhase;
+  const requiredAmpacityPerConductor = conductorsPerPhase > 0 ? (I / conductorsPerPhase) : I;
   const minRowAmp = CABLE_DATA.find(r => {
     const cap = mat === 'al' ? r.al : r.cu;
-    return cap > 0 && cap >= I;
+    return cap > 0 && cap >= requiredAmpacityPerConductor;
   }) || CABLE_DATA[CABLE_DATA.length-1];
 
   const minRow = minRowVD.area >= minRowAmp.area ? minRowVD : minRowAmp;
@@ -1047,7 +1048,8 @@ function runCableCalc() {
   vdEl.className = 'calc-value ' + (vd_pct > 5 ? 'calc-err' : vd_pct > 3 ? 'calc-warn' : 'calc-ok');
 
   document.getElementById('cv-minsize').textContent = I > 0 ? minRow.size + ' AWG' : '—';
-  document.getElementById('cv-ampacity').textContent = ampacity > 0 ? ampacity + ' A' : 'N/A (Al <#6)';
+  document.getElementById('cv-ampacity').textContent =
+    ampacity > 0 ? `${totalAmpacity} A (${ampacity} × ${conductorsPerPhase})` : 'N/A (Al <#6)';
   document.getElementById('cv-parallel').textContent =
     parallelRuns > 0 ? `${parallelRuns}(${phases}${row.size})` : '—';
 
