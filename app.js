@@ -73,7 +73,7 @@ const CONDUCTOR_AREA_MM2 = {
   '1250': 633.5,
 };
 
-const BONDING_SCOPE_OPTIONS = ['Service Equipment', 'Feeder', 'Branch Circuit'];
+const BONDING_SCOPE_OPTIONS = ['Feeder/Branch'];
 const BONDING_METHOD_OPTIONS = ['Overcurrent Device', 'Largest Ungrounded (VD Increased)'];
 
 const TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS = [600, 480, 208];
@@ -110,7 +110,7 @@ const COMP_DEFS = {
   bus:         { w:110, h:50,  label:'Bus Bar',      color:'#f9e2af', titleColor:'#f9e2af',
                  defaults:{name:'BUS-1', voltage:120, amps:400, phases:3} },
   cable:       { w:90,  h:60,  label:'Cable',        color:'#a6e3a1', titleColor:'#a6e3a1',
-                 defaults:{name:'CAB-1', conductors:1, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120, system:'3ph/4w', bonding_scope:'Feeder', bonding_method:'Overcurrent Device', ocpd_amps:20, bonding_material:'Cu'} },
+                 defaults:{name:'CAB-1', conductors:1, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120, system:'3ph/4w', bonding_scope:'Feeder/Branch', bonding_method:'Overcurrent Device', ocpd_amps:20, bonding_material:'Cu'} },
   load:        { w:60,  h:80,  label:'Load',         color:'#f38ba8', titleColor:'#f38ba8',
                  defaults:{name:'LOAD-1', current:20, voltage:120, phases:1} },
   meter:       { w:70,  h:70,  label:'Meter',        color:'#b4befe', titleColor:'#b4befe',
@@ -127,7 +127,7 @@ const FIELD_DEFS = {
   cable: [
   {k:'name',l:'Tag'},
   {k:'size',l:'Size', t:'select', options: CABLE_DATA.map(d => d.size)}, // Changed to select
-  {k:'material',l:'Material (Cu/Al)'},
+  {k:'material',l:'Material',t:'select',options:['Cu','Al']},
   {k:'conductors',l:'# Cond / Phase',t:'number'},
   {k:'insulation',l:'Insulation'},
   {k:'length',l:'Length (m)',t:'number'},
@@ -1229,23 +1229,17 @@ function enforceRule106165MaxBondingSize(calculatedSize, phaseConductorSize) {
 
 function getBondingSelectionForCable(cableNode, context) {
   const p = cableNode?.props || {};
-  const scope = p.bonding_scope || 'Feeder';
   const bondingMaterial = p.bonding_material || p.material || 'Cu';
   const method = p.bonding_method || 'Overcurrent Device';
   const ocpdAmps = parseFloat(p.ocpd_amps) || 0;
   const largestUngroundedAmpacity = context.totalAmpacity || 0;
 
-  // Rule 10-616(2): service equipment based on largest ungrounded conductor ampacity.
   // Rule 10-616(3): feeder/branch uses OCPD, or largest ungrounded conductor ampacity when upsized for VD.
   let referenceAmps = 0;
   let basisDescription = '—';
-  let ruleRef = 'Rule 10-616(2)/(3) + Table 16';
+  let ruleRef = 'Rule 10-616(3) + Table 16';
 
-  if (scope === 'Service Equipment') {
-    referenceAmps = largestUngroundedAmpacity;
-    basisDescription = `Service: largest ungrounded conductor ampacity (${largestUngroundedAmpacity || 0} A)`;
-    ruleRef = 'Rule 10-616(2) + Table 16';
-  } else if (method === 'Largest Ungrounded (VD Increased)') {
+  if (method === 'Largest Ungrounded (VD Increased)') {
     referenceAmps = largestUngroundedAmpacity;
     basisDescription = `Feeder/Branch (VD increase): largest ungrounded conductor ampacity (${largestUngroundedAmpacity || 0} A)`;
     ruleRef = 'Rule 10-616(3)(b) + Table 16';
