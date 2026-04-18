@@ -1282,8 +1282,14 @@ function getBondingSelectionForCable(cableNode, context) {
   return { size, basisDescription, ruleRef };
 }
 
-function calculateLoadCurrent(loadNode) {
-  const p = loadNode.props || {};
+function calculateReviewCurrent(node) {
+  const p = node.props || {};
+
+  if (node.type === 'panel') {
+    const panelMainAmps = parseFloat(p.main_amps) || 0;
+    if (panelMainAmps > 0) return panelMainAmps;
+  }
+
   const current = parseFloat(p.current) || 0;
   if (current > 0) return current;
 
@@ -1323,24 +1329,25 @@ function findPath(startId, targetTypes, graph) {
 }
 
 function reviewCoordination() {
-  const loads = nodes.filter(n => n.type === 'load');
-  if (loads.length === 0) {
+  const reviewNodes = nodes.filter(n => n.type === 'load' || n.type === 'panel');
+  if (reviewNodes.length === 0) {
     document.getElementById('review-content').innerHTML =
-      '<div class="props-empty" style="text-align:center;padding:32px">No loads found.<br>Add load components and connections to review path coordination.</div>';
+      '<div class="props-empty" style="text-align:center;padding:32px">No load or panel found.<br>Add load/panel components and connections to review path coordination.</div>';
     document.getElementById('review-modal').classList.add('open');
     return;
   }
 
   const graph = buildAdjacency();
   let html = '';
-  for (const load of loads) {
-    const loadName = load.props?.name || `LOAD-${load.id}`;
-    const loadAmps = calculateLoadCurrent(load);
-    const path = findPath(load.id, ['utility', 'transformer', 'panel', 'bus'], graph);
+  for (const reviewNode of reviewNodes) {
+    const reviewTypeLabel = reviewNode.type === 'panel' ? 'Panel' : 'Load';
+    const reviewName = reviewNode.props?.name || `${reviewTypeLabel.toUpperCase()}-${reviewNode.id}`;
+    const loadAmps = calculateReviewCurrent(reviewNode);
+    const path = findPath(reviewNode.id, ['utility', 'transformer', 'panel', 'bus'], graph);
     const messages = [];
 
     if (!path) {
-      messages.push('<li class="review-err">✕ Load is not connected to any source/panel path.</li>');
+      messages.push(`<li class="review-err">✕ ${reviewTypeLabel} is not connected to any source/panel path.</li>`);
     } else {
       const pathNodes = path.map(id => nodes.find(n => n.id === id)).filter(Boolean);
       const pathText = pathNodes.map(n => n.props?.name || COMP_DEFS[n.type].label).join(' → ');
@@ -1389,14 +1396,14 @@ function reviewCoordination() {
     }
 
     if (loadAmps <= 0) {
-      messages.push('<li class="review-warn">△ Load current is 0A. Enter FLA or valid kW/voltage/PF for stronger checks.</li>');
+      messages.push(`<li class="review-warn">△ ${reviewTypeLabel} current is 0A. Enter a valid current for stronger checks.</li>`);
     } else {
-      messages.push(`<li class="review-ok">Calculated load current: ${loadAmps.toFixed(1)}A.</li>`);
+      messages.push(`<li class="review-ok">Calculated ${reviewTypeLabel.toLowerCase()} current: ${loadAmps.toFixed(1)}A.</li>`);
     }
 
     html += `
       <div class="review-block">
-        <div class="review-title">${loadName}</div>
+        <div class="review-title">${reviewName}</div>
         <ul class="review-list">${messages.join('')}</ul>
       </div>
     `;
