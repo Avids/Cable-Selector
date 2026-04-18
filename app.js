@@ -102,7 +102,7 @@ const COMP_DEFS = {
   utility:     { w:80,  h:80,  label:'Utility',      color:'#89b4fa', titleColor:'#89b4fa',
                  defaults:{name:'UTIL-1', voltage:600, phases:3, fault_kA:25} },
   transformer: { w:80,  h:90,  label:'Transformer',  color:'#cba6f7', titleColor:'#cba6f7',
-                 defaults:{name:'TX-1', kva:75, primary_v:600, secondary_v:208, phases:3, impedance:4.5, conn:'Delta-Wye'} },
+                 defaults:{name:'TX-1', spec:'STEP-DOWN', kva:75, primary_v:600, secondary_v:208, phases:3, impedance:4.5, conn:'Delta-Wye'} },
   panel:       { w:90,  h:80,  label:'Panel',        color:'#94e2d5', titleColor:'#94e2d5',
                  defaults:{name:'MDP', voltage:120, system:'3ph/4w', main_amps:200, short_ckt_kA:10, mfr:'Square D'} },
   breaker:     { w:60,  h:80,  label:'Breaker',      color:'#74c7ec', titleColor:'#74c7ec',
@@ -121,7 +121,7 @@ const COMP_DEFS = {
 
 const FIELD_DEFS = {
   utility:     [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'fault_kA',l:'Fault (kA)',t:'number'}],
-  transformer: [{k:'name',l:'Tag'},{k:'kva',l:'KVA',t:'select',options:TRANSFORMER_KVA_OPTIONS},{k:'primary_v',l:'Primary V',t:'select',options:TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS},{k:'secondary_v',l:'Secondary V',t:'select',options:TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
+  transformer: [{k:'name',l:'Tag'},{k:'spec',l:'Spec',t:'select',options:['STEP-DOWN','STEP-UP']},{k:'kva',l:'KVA',t:'select',options:TRANSFORMER_KVA_OPTIONS},{k:'primary_v',l:'Primary V',t:'select',options:TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS},{k:'secondary_v',l:'Secondary V',t:'select',options:TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
   panel:       [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:PANEL_VOLTAGE_OPTIONS},{k:'system',l:'System',t:'select',options:SYSTEM_TYPE_OPTIONS},{k:'main_amps',l:'Main Amps',t:'number'},{k:'short_ckt_kA',l:'SCCR (kA)',t:'number'},{k:'mfr',l:'Manufacturer'}],
   breaker:     [{k:'name',l:'Tag'},{k:'amps',l:'Trip (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'system',l:'System',t:'select',options:SYSTEM_TYPE_OPTIONS},{k:'kaic',l:'kAIC',t:'number'},{k:'mfr',l:'Manufacturer'}],
   fuse:        [{k:'name',l:'Tag'},{k:'amps',l:'Rating (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'fuse_class',l:'Fuse Class'},{k:'poles',l:'Poles',t:'number'}],
@@ -1282,8 +1282,14 @@ function getBondingSelectionForCable(cableNode, context) {
   return { size, basisDescription, ruleRef };
 }
 
-function calculateLoadCurrent(loadNode) {
-  const p = loadNode.props || {};
+function calculateReviewCurrent(node) {
+  const p = node.props || {};
+
+  if (node.type === 'panel') {
+    const panelMainAmps = parseFloat(p.main_amps) || 0;
+    if (panelMainAmps > 0) return panelMainAmps;
+  }
+
   const current = parseFloat(p.current) || 0;
   if (current > 0) return current;
 
@@ -1292,6 +1298,19 @@ function calculateLoadCurrent(loadNode) {
   if (legacyAmps > 0) return legacyAmps;
 
   return 0;
+}
+
+function calculateTransformerPrimaryCurrent(transformerNode) {
+  const p = transformerNode?.props || {};
+  const kva = parseFloat(p.kva) || 0;
+  const primaryVoltage = parseFloat(p.primary_v) || 0;
+  const phases = Math.max(1, parseInt(p.phases, 10) || 3);
+  if (kva <= 0 || primaryVoltage <= 0) return 0;
+
+  if (phases >= 3) {
+    return (kva * 1000) / (Math.sqrt(3) * primaryVoltage);
+  }
+  return (kva * 1000) / primaryVoltage;
 }
 
 function buildAdjacency() {
@@ -1305,14 +1324,13 @@ function buildAdjacency() {
   return graph;
 }
 
-function findPath(startId, targetTypes, graph) {
+function findShortestPath(startId, endId, graph) {
   const queue = [[startId]];
   const seen = new Set([startId]);
   while (queue.length) {
     const path = queue.shift();
     const id = path[path.length - 1];
-    const n = nodes.find(node => node.id === id);
-    if (n && targetTypes.includes(n.type) && id !== startId) return path;
+    if (id === endId) return path;
     for (const nextId of graph.get(id) || []) {
       if (seen.has(nextId)) continue;
       seen.add(nextId);
@@ -1322,81 +1340,121 @@ function findPath(startId, targetTypes, graph) {
   return null;
 }
 
+function getReviewPaths(reviewNode, graph) {
+  const sourceCandidates = nodes.filter(n => n.id !== reviewNode.id && ['utility', 'transformer', 'panel', 'bus'].includes(n.type));
+  const preferredSourcePaths = [];
+  const fallbackPaths = [];
+
+  for (const source of sourceCandidates) {
+    const path = findShortestPath(source.id, reviewNode.id, graph);
+    if (!path || path.length < 2) continue;
+
+    if (source.type === 'utility' || source.type === 'transformer') {
+      preferredSourcePaths.push(path);
+    } else {
+      fallbackPaths.push(path);
+    }
+  }
+
+  const chosenPaths = preferredSourcePaths.length > 0 ? preferredSourcePaths : fallbackPaths;
+  const unique = new Map();
+  for (const path of chosenPaths) {
+    unique.set(path.join('->'), path);
+  }
+  return [...unique.values()];
+}
+
 function reviewCoordination() {
-  const loads = nodes.filter(n => n.type === 'load');
-  if (loads.length === 0) {
+  const reviewNodes = nodes.filter(n => n.type === 'load' || n.type === 'panel');
+  if (reviewNodes.length === 0) {
     document.getElementById('review-content').innerHTML =
-      '<div class="props-empty" style="text-align:center;padding:32px">No loads found.<br>Add load components and connections to review path coordination.</div>';
+      '<div class="props-empty" style="text-align:center;padding:32px">No load or panel found.<br>Add load/panel components and connections to review path coordination.</div>';
     document.getElementById('review-modal').classList.add('open');
     return;
   }
 
   const graph = buildAdjacency();
   let html = '';
-  for (const load of loads) {
-    const loadName = load.props?.name || `LOAD-${load.id}`;
-    const loadAmps = calculateLoadCurrent(load);
-    const path = findPath(load.id, ['utility', 'transformer', 'panel', 'bus'], graph);
+  for (const reviewNode of reviewNodes) {
+    const reviewTypeLabel = reviewNode.type === 'panel' ? 'Panel' : 'Load';
+    const reviewName = reviewNode.props?.name || `${reviewTypeLabel.toUpperCase()}-${reviewNode.id}`;
+    const loadAmps = calculateReviewCurrent(reviewNode);
+    const paths = getReviewPaths(reviewNode, graph);
     const messages = [];
 
-    if (!path) {
-      messages.push('<li class="review-err">✕ Load is not connected to any source/panel path.</li>');
+    if (paths.length === 0) {
+      messages.push(`<li class="review-err">✕ ${reviewTypeLabel} is not connected to any source/panel path.</li>`);
     } else {
-      const pathNodes = path.map(id => nodes.find(n => n.id === id)).filter(Boolean);
-      const pathText = pathNodes.map(n => n.props?.name || COMP_DEFS[n.type].label).join(' → ');
-      messages.push(`<li class="review-ok">Path found: ${pathText}</li>`);
+      for (const path of paths) {
+        const pathNodes = path.map(id => nodes.find(n => n.id === id)).filter(Boolean);
+        const sourceNode = pathNodes[0];
+        const pathText = pathNodes.map(n => n.props?.name || COMP_DEFS[n.type].label).join(' → ');
+        messages.push(`<li class="review-ok">Path from ${sourceNode?.props?.name || COMP_DEFS[sourceNode?.type || 'panel'].label}: ${pathText}</li>`);
 
-      const cablesOnPath = pathNodes.filter(n => n.type === 'cable');
-      if (cablesOnPath.length === 0) {
-        messages.push('<li class="review-warn">△ No cable component on this path to verify conductor sizing.</li>');
-      } else {
-        for (const cable of cablesOnPath) {
-          const cp = cable.props || {};
-          const row = getCableRow(cp.size);
-          const mat = (cp.material || 'Cu').toLowerCase().startsWith('al') ? 'al' : 'cu';
-          const ampacity = mat === 'al' ? row.al : row.cu;
-          const cableLoad = Math.max(parseFloat(cp.amps) || 0, loadAmps);
-          if (ampacity <= 0) {
-            messages.push(`<li class="review-err">✕ ${cp.name || 'Cable'}: size ${cp.size} ${mat.toUpperCase()} has no valid ampacity in table.</li>`);
-          } else if (cableLoad > ampacity) {
-            messages.push(`<li class="review-err">✕ ${cp.name || 'Cable'}: ${cableLoad.toFixed(1)}A load exceeds ${ampacity}A ampacity.</li>`);
-          } else {
-            messages.push(`<li class="review-ok">✓ ${cp.name || 'Cable'}: ${cp.size} ${mat.toUpperCase()} supports ${cableLoad.toFixed(1)}A (ampacity ${ampacity}A).</li>`);
+        const transformerOnPath = pathNodes.find(n => n.type === 'transformer');
+        const transformerPrimaryAmps = transformerOnPath ? calculateTransformerPrimaryCurrent(transformerOnPath) : 0;
+        const pathLoadAmps = transformerPrimaryAmps > 0 ? transformerPrimaryAmps : loadAmps;
+        if (transformerOnPath && transformerPrimaryAmps > 0) {
+          const txName = transformerOnPath.props?.name || 'Transformer';
+          const txPrimaryV = parseFloat(transformerOnPath.props?.primary_v) || 0;
+          const txSpec = transformerOnPath.props?.spec || 'STEP-DOWN';
+          messages.push(`<li class="review-ok">Using ${txName} primary-side current for ${txSpec} review: ${transformerPrimaryAmps.toFixed(1)}A @ ${txPrimaryV}V.</li>`);
+        }
+
+        const cablesOnPath = pathNodes.filter(n => n.type === 'cable');
+        if (cablesOnPath.length === 0) {
+          messages.push('<li class="review-warn">△ No cable component on this path to verify conductor sizing.</li>');
+        } else {
+          for (const cable of cablesOnPath) {
+            const cp = cable.props || {};
+            const row = getCableRow(cp.size);
+            const mat = (cp.material || 'Cu').toLowerCase().startsWith('al') ? 'al' : 'cu';
+            const ampacityPerRun = mat === 'al' ? row.al : row.cu;
+            const parallelRuns = Math.max(1, parseInt(cp.conductors, 10) || 1);
+            const totalAmpacity = ampacityPerRun > 0 ? ampacityPerRun * parallelRuns : 0;
+            const cableLoad = Math.max(parseFloat(cp.amps) || 0, pathLoadAmps);
+            if (ampacityPerRun <= 0) {
+              messages.push(`<li class="review-err">✕ ${cp.name || 'Cable'}: size ${cp.size} ${mat.toUpperCase()} has no valid ampacity in table.</li>`);
+            } else if (cableLoad > totalAmpacity) {
+              messages.push(`<li class="review-err">✕ ${cp.name || 'Cable'}: ${cableLoad.toFixed(1)}A load exceeds ${totalAmpacity}A ampacity (${ampacityPerRun}A × ${parallelRuns} run${parallelRuns > 1 ? 's' : ''}).</li>`);
+            } else {
+              messages.push(`<li class="review-ok">✓ ${cp.name || 'Cable'}: ${cp.size} ${mat.toUpperCase()} supports ${cableLoad.toFixed(1)}A (ampacity ${totalAmpacity}A = ${ampacityPerRun}A × ${parallelRuns} run${parallelRuns > 1 ? 's' : ''}).</li>`);
+            }
           }
         }
-      }
 
-      const protectionOnPath = pathNodes.filter(n => n.type === 'breaker' || n.type === 'fuse');
-      if (protectionOnPath.length === 0) {
-        messages.push('<li class="review-warn">△ No breaker/fuse found on path for protection coordination.</li>');
-      } else {
-        for (const device of protectionOnPath) {
-          const rating = parseFloat(device.props?.amps) || 0;
-          const name = device.props?.name || COMP_DEFS[device.type].label;
-          if (rating <= 0) {
-            messages.push(`<li class="review-err">✕ ${name}: missing amp rating.</li>`);
-            continue;
-          }
-          if (loadAmps > 0 && rating < loadAmps) {
-            messages.push(`<li class="review-err">✕ ${name}: ${rating}A is undersized for ${loadAmps.toFixed(1)}A load.</li>`);
-          } else if (loadAmps > 0 && rating > loadAmps * 2.5) {
-            messages.push(`<li class="review-warn">△ ${name}: ${rating}A appears oversized for ${loadAmps.toFixed(1)}A load.</li>`);
-          } else {
-            messages.push(`<li class="review-ok">✓ ${name}: ${rating}A rating is coordinated with ${loadAmps.toFixed(1)}A load.</li>`);
+        const protectionOnPath = pathNodes.filter(n => n.type === 'breaker' || n.type === 'fuse');
+        if (protectionOnPath.length === 0) {
+          messages.push('<li class="review-warn">△ No breaker/fuse found on path for protection coordination.</li>');
+        } else {
+          for (const device of protectionOnPath) {
+            const rating = parseFloat(device.props?.amps) || 0;
+            const name = device.props?.name || COMP_DEFS[device.type].label;
+            if (rating <= 0) {
+              messages.push(`<li class="review-err">✕ ${name}: missing amp rating.</li>`);
+              continue;
+            }
+            if (pathLoadAmps > 0 && rating < pathLoadAmps) {
+              messages.push(`<li class="review-err">✕ ${name}: ${rating}A is undersized for ${pathLoadAmps.toFixed(1)}A load.</li>`);
+            } else if (pathLoadAmps > 0 && rating > pathLoadAmps * 2.5) {
+              messages.push(`<li class="review-warn">△ ${name}: ${rating}A appears oversized for ${pathLoadAmps.toFixed(1)}A load.</li>`);
+            } else {
+              messages.push(`<li class="review-ok">✓ ${name}: ${rating}A rating is coordinated with ${pathLoadAmps.toFixed(1)}A load.</li>`);
+            }
           }
         }
       }
     }
 
     if (loadAmps <= 0) {
-      messages.push('<li class="review-warn">△ Load current is 0A. Enter FLA or valid kW/voltage/PF for stronger checks.</li>');
+      messages.push(`<li class="review-warn">△ ${reviewTypeLabel} current is 0A. Enter a valid current for stronger checks.</li>`);
     } else {
-      messages.push(`<li class="review-ok">Calculated load current: ${loadAmps.toFixed(1)}A.</li>`);
+      messages.push(`<li class="review-ok">Calculated ${reviewTypeLabel.toLowerCase()} current: ${loadAmps.toFixed(1)}A.</li>`);
     }
 
     html += `
       <div class="review-block">
-        <div class="review-title">${loadName}</div>
+        <div class="review-title">${reviewName}</div>
         <ul class="review-list">${messages.join('')}</ul>
       </div>
     `;
