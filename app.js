@@ -80,6 +80,13 @@ const TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS = [600, 480, 208];
 const TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS = [480, 208];
 const TRANSFORMER_KVA_OPTIONS = [3, 6, 9, 15, 30, 45, 75, 100, 112.5, 150, 225, 300, 450, 500, 600];
 const SYSTEM_VOLTAGE_OPTIONS = [600, 480, 347, 240, 208, 120];
+const PANEL_VOLTAGE_OPTIONS = [
+  { value: 600, label: '600/347V' },
+  { value: 208, label: '208/120V' },
+  { value: 600, label: '600V' },
+  { value: 208, label: '208V' },
+  { value: 120, label: '120V' },
+];
 const PHASE_OPTIONS = [1, 3];
 const SYSTEM_TYPE_OPTIONS = ['1ph/2w', '1ph/3w', '3ph/3w', '3ph/4w'];
 const SYSTEM_CONFIG = {
@@ -113,7 +120,7 @@ const COMP_DEFS = {
 const FIELD_DEFS = {
   utility:     [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'fault_kA',l:'Fault (kA)',t:'number'}],
   transformer: [{k:'name',l:'Tag'},{k:'kva',l:'KVA',t:'select',options:TRANSFORMER_KVA_OPTIONS},{k:'primary_v',l:'Primary V',t:'select',options:TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS},{k:'secondary_v',l:'Secondary V',t:'select',options:TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
-  panel:       [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'system',l:'System',t:'select',options:SYSTEM_TYPE_OPTIONS},{k:'main_amps',l:'Main Amps',t:'number'},{k:'short_ckt_kA',l:'SCCR (kA)',t:'number'},{k:'mfr',l:'Manufacturer'}],
+  panel:       [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:PANEL_VOLTAGE_OPTIONS},{k:'system',l:'System',t:'select',options:SYSTEM_TYPE_OPTIONS},{k:'main_amps',l:'Main Amps',t:'number'},{k:'short_ckt_kA',l:'SCCR (kA)',t:'number'},{k:'mfr',l:'Manufacturer'}],
   breaker:     [{k:'name',l:'Tag'},{k:'amps',l:'Trip (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'system',l:'System',t:'select',options:SYSTEM_TYPE_OPTIONS},{k:'kaic',l:'kAIC',t:'number'},{k:'mfr',l:'Manufacturer'}],
   fuse:        [{k:'name',l:'Tag'},{k:'amps',l:'Rating (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'fuse_class',l:'Fuse Class'},{k:'poles',l:'Poles',t:'number'}],
   bus:         [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'amps',l:'Ampacity (A)',t:'number'},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS}],
@@ -845,8 +852,10 @@ function showNodeProps(n) {
       // Generate dropdown
       html += `<select class="prop-input" data-nid="${n.id}" data-key="${f.k}" onchange="updateProp(this)">`;
       f.options.forEach(opt => {
-        const selected = opt === val ? 'selected' : '';
-        html += `<option value="${opt}" ${selected}>${opt}</option>`;
+        const optionValue = typeof opt === 'object' && opt !== null ? opt.value : opt;
+        const optionLabel = typeof opt === 'object' && opt !== null ? opt.label : opt;
+        const selected = String(optionValue) === String(val) ? 'selected' : '';
+        html += `<option value="${optionValue}" ${selected}>${optionLabel}</option>`;
       });
       html += `</select>`;
     } else {
