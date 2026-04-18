@@ -174,10 +174,27 @@ let hoverPortInfo = null;
 let canvasStyle = 'engineering';
 let suppressCanvasBackdrop = false;
 let wireRouting = 'orthogonal';
+const PROJECT_FILE_EXTENSION = 'edsld';
+const DEFAULT_PROJECT_NAME = 'untitled';
+let projectName = DEFAULT_PROJECT_NAME;
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const wrap = document.getElementById('canvas-wrap');
+
+function normalizeProjectName(name) {
+  const value = String(name || '').trim();
+  return value || DEFAULT_PROJECT_NAME;
+}
+
+function getProjectFileName(name = projectName) {
+  return `${normalizeProjectName(name)}.${PROJECT_FILE_EXTENSION}`;
+}
+
+function setProjectName(name) {
+  projectName = normalizeProjectName(name);
+  document.getElementById('project-name').textContent = `PROJECT: ${projectName.toUpperCase()}`;
+}
 
 // ═══════════════════════════════════════════════════
 // CANVAS SIZING
@@ -1030,6 +1047,7 @@ function deleteSelected() {
 function clearAll() {
   if (!confirm('Clear the entire diagram?')) return;
   nodes = []; wires = []; selected = null;
+  setProjectName(DEFAULT_PROJECT_NAME);
   syncCableVoltages();
   showEmptyProps();
   draw();
@@ -1590,11 +1608,62 @@ function getCableEndpoints(cableNode) {
 // ═══════════════════════════════════════════════════
 
 function saveProject() {
-  const data = JSON.stringify({ version:1, nodes, wires, pan, zoom, idCounter }, null, 2);
+  const requestedProjectName = window.prompt('Project name:', normalizeProjectName(projectName));
+  if (requestedProjectName === null) return;
+
+  const trimmedProjectName = requestedProjectName.trim();
+  if (!trimmedProjectName) {
+    alert('Please enter a valid project name.');
+    return;
+  }
+
+  const baseProjectName = trimmedProjectName
+    .replace(/\.[a-z0-9]+$/i, '')
+    .trim();
+  const normalizedProjectName = normalizeProjectName(baseProjectName);
+  setProjectName(normalizedProjectName);
+
+  const data = JSON.stringify({ version:1, projectName: normalizedProjectName, nodes, wires, pan, zoom, idCounter }, null, 2);
+  const fileName = getProjectFileName(normalizedProjectName);
   const a = document.createElement('a');
   a.href = 'data:application/json,' + encodeURIComponent(data);
-  a.download = 'sld_project.json';
+  a.download = fileName;
   a.click();
+}
+
+function getProjectNameFromFileName(fileName) {
+  const cleanFileName = String(fileName || '').trim();
+  if (!cleanFileName) return DEFAULT_PROJECT_NAME;
+  const extensionPattern = new RegExp(`\\.${PROJECT_FILE_EXTENSION}$`, 'i');
+  if (extensionPattern.test(cleanFileName)) {
+    return normalizeProjectName(cleanFileName.replace(extensionPattern, ''));
+  }
+  return normalizeProjectName(cleanFileName.replace(/\.[^.]+$/, ''));
+}
+
+function loadProject(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const d = JSON.parse(ev.target.result);
+      nodes = d.nodes || [];
+      wires = d.wires || [];
+      pan = d.pan || { x: 0, y: 0 };
+      zoom = d.zoom || 1;
+      idCounter = d.idCounter || 100;
+      const loadedProjectName = normalizeProjectName(d.projectName || getProjectNameFromFileName(file.name));
+      setProjectName(loadedProjectName);
+      syncCableVoltages();
+      document.getElementById('zoom-label').textContent = Math.round(zoom * 100) + '%';
+      selected = null;
+      showEmptyProps();
+      draw();
+    } catch(err) { alert('Could not load file — invalid format.'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
 }
 
 function printCanvas() {
@@ -1685,29 +1754,6 @@ function printCanvas() {
   }
 }
 
-function loadProject(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    try {
-      const d = JSON.parse(ev.target.result);
-      nodes = d.nodes || [];
-      wires = d.wires || [];
-      pan = d.pan || { x: 0, y: 0 };
-      zoom = d.zoom || 1;
-      idCounter = d.idCounter || 100;
-      syncCableVoltages();
-      document.getElementById('zoom-label').textContent = Math.round(zoom * 100) + '%';
-      selected = null;
-      showEmptyProps();
-      draw();
-    } catch(err) { alert('Could not load file — invalid format.'); }
-  };
-  reader.readAsText(file);
-  e.target.value = '';
-}
-
 // ═══════════════════════════════════════════════════
 // KEYBOARD
 // ═══════════════════════════════════════════════════
@@ -1736,3 +1782,4 @@ document.addEventListener('keydown', e => {
 resetView();
 wrap.classList.toggle('engineering', canvasStyle === 'engineering');
 document.getElementById('btn-canvas-style').classList.toggle('active', canvasStyle === 'engineering');
+setProjectName(DEFAULT_PROJECT_NAME);
