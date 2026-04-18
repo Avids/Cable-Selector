@@ -1069,6 +1069,11 @@ function getCableAmpacity(row, material, terminationTemp = CABLE_TERMINATION_TEM
   return Number(table[temp]) || 0;
 }
 
+function formatAmpacityDisplay(totalAmpacity, baseAmpacity, conductorsPerPhase, terminationTemp) {
+  if (!(baseAmpacity > 0)) return 'N/A (no value)';
+  return `${totalAmpacity} A (${baseAmpacity} × ${conductorsPerPhase}, ${terminationTemp}°C term)`;
+}
+
 function getMinimumCableSizeForLoad(loadAmps, material, conductorsPerPhase = 1, terminationTemp = CABLE_TERMINATION_TEMP_C) {
   const load = Number(loadAmps);
   if (!Number.isFinite(load) || load <= 0) return null;
@@ -1170,8 +1175,7 @@ function runCableCalc() {
   vdEl.className = 'calc-value ' + (vd_pct > 5 ? 'calc-err' : vd_pct > 3 ? 'calc-warn' : 'calc-ok');
 
   const ampacityEl = document.getElementById('cv-ampacity');
-  ampacityEl.textContent =
-    ampacity > 0 ? `${totalAmpacity} A (${ampacity} × ${conductorsPerPhase}, ${terminationTemp}°C term)` : 'N/A (no value)';
+  ampacityEl.textContent = formatAmpacityDisplay(totalAmpacity, ampacity, conductorsPerPhase, terminationTemp);
   ampacityEl.className = 'calc-value ' + (ampOk ? 'calc-ok' : 'calc-err');
   const requiredEl = document.getElementById('cv-required-ampacity');
   requiredEl.textContent = `${sizingCurrent.toFixed(2)} A`;
