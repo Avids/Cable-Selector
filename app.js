@@ -212,19 +212,35 @@ function toScreen(wx, wy) {
   return { x: wx * zoom + pan.x, y: wy * zoom + pan.y };
 }
 
+function getConnectionFrame(n) {
+  const d = COMP_DEFS[n.type];
+  if (canvasStyle !== 'engineering') {
+    return { x: n.x, y: n.y, w: d.w, h: d.h };
+  }
+
+  const framePadX = 6;
+  const framePadY = 4;
+  return {
+    x: n.x + framePadX,
+    y: n.y + 8 + framePadY,
+    w: d.w - framePadX * 2,
+    h: d.h - 24 - framePadY * 2,
+  };
+}
+
 // ═══════════════════════════════════════════════════
 // PORTS
 // ═══════════════════════════════════════════════════
 
 function getPorts(n) {
-  const d = COMP_DEFS[n.type];
-  const cx = n.x + d.w / 2;
-  const cy = n.y + d.h / 2;
+  const frame = getConnectionFrame(n);
+  const cx = frame.x + frame.w / 2;
+  const cy = frame.y + frame.h / 2;
   return [
-    { id: 'T', x: cx,      y: n.y       },
-    { id: 'B', x: cx,      y: n.y + d.h },
-    { id: 'L', x: n.x,     y: cy        },
-    { id: 'R', x: n.x+d.w, y: cy        },
+    { id: 'T', x: cx,              y: frame.y           },
+    { id: 'B', x: cx,              y: frame.y + frame.h },
+    { id: 'L', x: frame.x,         y: cy                },
+    { id: 'R', x: frame.x+frame.w, y: cy                },
   ];
 }
 
@@ -390,6 +406,12 @@ function drawNode(n, isSel, isHov) {
     ctx.fillStyle = '#8a1111';
     ctx.lineWidth = 1.6 / zoom;
     drawSymbol(ctx, n.type, x, y + 8/zoom, w, h - 24/zoom, zoom);
+
+    const frame = getConnectionFrame(n);
+    ctx.lineWidth = 1 / zoom;
+    ctx.setLineDash([4 / zoom, 3 / zoom]);
+    ctx.strokeRect(frame.x, frame.y, frame.w, frame.h);
+    ctx.setLineDash([]);
 
     const textX = x + w + 8;
     const textY = y + 2;
