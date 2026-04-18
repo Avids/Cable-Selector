@@ -92,7 +92,15 @@
     border-color: var(--accent);
     color: var(--text);
   }
-  #status-bar { margin-left: auto; font-size: 11px; font-family: var(--mono); color: var(--text3); }
+  #project-name {
+    margin-left: auto;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  #status-bar { font-size: 11px; font-family: var(--mono); color: var(--text3); }
 
   /* WORKSPACE */
   #workspace { display: flex; flex: 1; overflow: hidden; }
