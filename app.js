@@ -1123,6 +1123,7 @@ function runCableCalc() {
   const p = selected.props;
   const V = p.voltage || 120;
   const I = p.amps || 0;
+  const sizingCurrent = I * 1.25;
   const L = p.length || 1;
   const mat = (p.material || 'Cu').toLowerCase().startsWith('al') ? 'al' : 'cu';
   const row = getCableRow(p.size);
@@ -1137,7 +1138,7 @@ function runCableCalc() {
 
   const ampacity = mat === 'al' ? row.al : row.cu;
   const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
-  const ampOk = totalAmpacity > 0 && I <= totalAmpacity;
+  const ampOk = totalAmpacity > 0 && sizingCurrent <= totalAmpacity;
   const parallelRuns = conductorsPerPhase;
   const bonding = getBondingSelectionForCable(selected, {
     totalAmpacity,
@@ -1151,7 +1152,9 @@ function runCableCalc() {
   vdEl.className = 'calc-value ' + (vd_pct > 5 ? 'calc-err' : vd_pct > 3 ? 'calc-warn' : 'calc-ok');
 
   document.getElementById('cv-ampacity').textContent =
-    ampacity > 0 ? `${totalAmpacity} A (${ampacity} × ${conductorsPerPhase})` : 'N/A (Al <#6)';
+    ampacity > 0
+      ? `${totalAmpacity} A (${ampacity} × ${conductorsPerPhase}) / Required ${sizingCurrent.toFixed(2)} A (125%)`
+      : 'N/A (Al <#6)';
   document.getElementById('cv-parallel').textContent =
     parallelRuns > 0 ? `${parallelRuns}(${phases}${row.size})` : '—';
   document.getElementById('cv-bonding-rule').textContent = bonding.ruleRef;
