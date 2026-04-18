@@ -1361,14 +1361,16 @@ function reviewCoordination() {
           const cp = cable.props || {};
           const row = getCableRow(cp.size);
           const mat = (cp.material || 'Cu').toLowerCase().startsWith('al') ? 'al' : 'cu';
-          const ampacity = mat === 'al' ? row.al : row.cu;
+          const ampacityPerRun = mat === 'al' ? row.al : row.cu;
+          const parallelRuns = Math.max(1, parseInt(cp.conductors, 10) || 1);
+          const totalAmpacity = ampacityPerRun > 0 ? ampacityPerRun * parallelRuns : 0;
           const cableLoad = Math.max(parseFloat(cp.amps) || 0, loadAmps);
-          if (ampacity <= 0) {
+          if (ampacityPerRun <= 0) {
             messages.push(`<li class="review-err">✕ ${cp.name || 'Cable'}: size ${cp.size} ${mat.toUpperCase()} has no valid ampacity in table.</li>`);
-          } else if (cableLoad > ampacity) {
-            messages.push(`<li class="review-err">✕ ${cp.name || 'Cable'}: ${cableLoad.toFixed(1)}A load exceeds ${ampacity}A ampacity.</li>`);
+          } else if (cableLoad > totalAmpacity) {
+            messages.push(`<li class="review-err">✕ ${cp.name || 'Cable'}: ${cableLoad.toFixed(1)}A load exceeds ${totalAmpacity}A ampacity (${ampacityPerRun}A × ${parallelRuns} run${parallelRuns > 1 ? 's' : ''}).</li>`);
           } else {
-            messages.push(`<li class="review-ok">✓ ${cp.name || 'Cable'}: ${cp.size} ${mat.toUpperCase()} supports ${cableLoad.toFixed(1)}A (ampacity ${ampacity}A).</li>`);
+            messages.push(`<li class="review-ok">✓ ${cp.name || 'Cable'}: ${cp.size} ${mat.toUpperCase()} supports ${cableLoad.toFixed(1)}A (ampacity ${totalAmpacity}A = ${ampacityPerRun}A × ${parallelRuns} run${parallelRuns > 1 ? 's' : ''}).</li>`);
           }
         }
       }
