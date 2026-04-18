@@ -890,6 +890,14 @@ function updateProp(input) {
   if (!n) return;
   const numKeys = ['voltage','phases','amps','current','kva','primary_v','secondary_v','impedance','main_amps','short_ckt_kA','kaic','fault_kA','kw','hp','pf','length','conductors','ocpd_amps'];
   n.props[key] = numKeys.includes(key) ? parseFloat(input.value) || 0 : input.value;
+  if (n.type === 'cable' && (key === 'amps' || key === 'material' || key === 'conductors')) {
+    const recommendedSize = getMinimumCableSizeForLoad(n.props.amps, n.props.material, n.props.conductors);
+    if (recommendedSize) {
+      n.props.size = recommendedSize;
+      const sizeInput = document.querySelector(`.prop-input[data-nid="${n.id}"][data-key="size"]`);
+      if (sizeInput) sizeInput.value = recommendedSize;
+    }
+  }
   if (key === 'system' && (n.type === 'panel' || n.type === 'cable' || n.type === 'breaker')) {
     n.props.phases = getSystemPhaseCount(n.props.system, n.props.phases);
   }
@@ -1042,6 +1050,23 @@ function getCableRow(size) {
 
   const strippedInput = normalizedSize.replace(/^#/, '');
   return CABLE_DATA.find(r => r.size.replace(/^#/, '') === strippedInput) || CABLE_DATA[1];
+}
+
+function getMinimumCableSizeForLoad(loadAmps, material, conductorsPerPhase = 1) {
+  const load = Number(loadAmps);
+  if (!Number.isFinite(load) || load <= 0) return null;
+
+  const requiredAmpacity = load * 1.25; // CSA load-conductor sizing basis.
+  const mat = String(material || 'Cu').toLowerCase().startsWith('al') ? 'al' : 'cu';
+  const conductors = Math.max(1, parseInt(conductorsPerPhase, 10) || 1);
+
+  for (const row of CABLE_DATA) {
+    const ampacity = mat === 'al' ? row.al : row.cu;
+    if (!ampacity || ampacity <= 0) continue;
+    if (ampacity * conductors >= requiredAmpacity) return row.size;
+  }
+
+  return null;
 }
 
 function getConnectedNodeIds(startId) {
