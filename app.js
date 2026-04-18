@@ -1591,9 +1591,23 @@ function getCableEndpoints(cableNode) {
 
 function saveProject() {
   const data = JSON.stringify({ version:1, nodes, wires, pan, zoom, idCounter }, null, 2);
+  const defaultFileName = 'sld_project.json';
+  const requestedFileName = window.prompt('Enter a file name for this project:', defaultFileName);
+  if (requestedFileName === null) return;
+
+  const trimmedFileName = requestedFileName.trim();
+  if (!trimmedFileName) {
+    alert('Please enter a valid file name.');
+    return;
+  }
+
+  const fileName = trimmedFileName.toLowerCase().endsWith('.json')
+    ? trimmedFileName
+    : `${trimmedFileName}.json`;
+
   const a = document.createElement('a');
   a.href = 'data:application/json,' + encodeURIComponent(data);
-  a.download = 'sld_project.json';
+  a.download = fileName;
   a.click();
 }
 
