@@ -73,7 +73,7 @@ const CONDUCTOR_AREA_MM2 = {
   '1250': 633.5,
 };
 
-const BONDING_SCOPE_OPTIONS = ['Service Equipment', 'Feeder', 'Branch Circuit'];
+const BONDING_SCOPE_OPTIONS = ['Feeder/Branch'];
 const BONDING_METHOD_OPTIONS = ['Overcurrent Device', 'Largest Ungrounded (VD Increased)'];
 
 const TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS = [600, 480, 208];
@@ -110,7 +110,7 @@ const COMP_DEFS = {
   bus:         { w:110, h:50,  label:'Bus Bar',      color:'#f9e2af', titleColor:'#f9e2af',
                  defaults:{name:'BUS-1', voltage:120, amps:400, phases:3} },
   cable:       { w:90,  h:60,  label:'Cable',        color:'#a6e3a1', titleColor:'#a6e3a1',
-                 defaults:{name:'CAB-1', conductors:1, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120, system:'3ph/4w', bonding_scope:'Feeder', bonding_method:'Overcurrent Device', ocpd_amps:20, bonding_material:'Cu'} },
+                 defaults:{name:'CAB-1', conductors:1, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120, system:'3ph/4w', bonding_scope:'Feeder/Branch', bonding_method:'Overcurrent Device', ocpd_amps:20, bonding_material:'Cu'} },
   load:        { w:60,  h:80,  label:'Load',         color:'#f38ba8', titleColor:'#f38ba8',
                  defaults:{name:'LOAD-1', current:20, voltage:120, phases:1} },
   meter:       { w:70,  h:70,  label:'Meter',        color:'#b4befe', titleColor:'#b4befe',
@@ -127,7 +127,7 @@ const FIELD_DEFS = {
   cable: [
   {k:'name',l:'Tag'},
   {k:'size',l:'Size', t:'select', options: CABLE_DATA.map(d => d.size)}, // Changed to select
-  {k:'material',l:'Material (Cu/Al)'},
+  {k:'material',l:'Material',t:'select',options:['Cu','Al']},
   {k:'conductors',l:'# Cond / Phase',t:'number'},
   {k:'insulation',l:'Insulation'},
   {k:'length',l:'Length (m)',t:'number'},
@@ -890,6 +890,14 @@ function updateProp(input) {
   if (!n) return;
   const numKeys = ['voltage','phases','amps','current','kva','primary_v','secondary_v','impedance','main_amps','short_ckt_kA','kaic','fault_kA','kw','hp','pf','length','conductors','ocpd_amps'];
   n.props[key] = numKeys.includes(key) ? parseFloat(input.value) || 0 : input.value;
+  if (n.type === 'cable' && (key === 'amps' || key === 'material' || key === 'conductors')) {
+    const recommendedSize = getMinimumCableSizeForLoad(n.props.amps, n.props.material, n.props.conductors);
+    if (recommendedSize) {
+      n.props.size = recommendedSize;
+      const sizeInput = document.querySelector(`.prop-input[data-nid="${n.id}"][data-key="size"]`);
+      if (sizeInput) sizeInput.value = recommendedSize;
+    }
+  }
   if (key === 'system' && (n.type === 'panel' || n.type === 'cable' || n.type === 'breaker')) {
     n.props.phases = getSystemPhaseCount(n.props.system, n.props.phases);
   }
@@ -932,6 +940,10 @@ function setMode(m) {
 function setWireRouting(routing) {
   wireRouting = routing === 'straight' ? 'straight' : 'orthogonal';
   draw();
+}
+
+function showRulesHelp() {
+  document.getElementById('rules-modal')?.classList.add('open');
 }
 
 // ═══════════════════════════════════════════════════
@@ -1044,6 +1056,23 @@ function getCableRow(size) {
   return CABLE_DATA.find(r => r.size.replace(/^#/, '') === strippedInput) || CABLE_DATA[1];
 }
 
+function getMinimumCableSizeForLoad(loadAmps, material, conductorsPerPhase = 1) {
+  const load = Number(loadAmps);
+  if (!Number.isFinite(load) || load <= 0) return null;
+
+  const requiredAmpacity = load * 1.25; // CSA load-conductor sizing basis.
+  const mat = String(material || 'Cu').toLowerCase().startsWith('al') ? 'al' : 'cu';
+  const conductors = Math.max(1, parseInt(conductorsPerPhase, 10) || 1);
+
+  for (const row of CABLE_DATA) {
+    const ampacity = mat === 'al' ? row.al : row.cu;
+    if (!ampacity || ampacity <= 0) continue;
+    if (ampacity * conductors >= requiredAmpacity) return row.size;
+  }
+
+  return null;
+}
+
 function getConnectedNodeIds(startId) {
   const visited = new Set([startId]);
   const queue = [startId];
@@ -1098,6 +1127,7 @@ function runCableCalc() {
   const p = selected.props;
   const V = p.voltage || 120;
   const I = p.amps || 0;
+  const sizingCurrent = I * 1.25;
   const L = p.length || 1;
   const mat = (p.material || 'Cu').toLowerCase().startsWith('al') ? 'al' : 'cu';
   const row = getCableRow(p.size);
@@ -1112,7 +1142,7 @@ function runCableCalc() {
 
   const ampacity = mat === 'al' ? row.al : row.cu;
   const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
-  const ampOk = totalAmpacity > 0 && I <= totalAmpacity;
+  const ampOk = totalAmpacity > 0 && sizingCurrent <= totalAmpacity;
   const parallelRuns = conductorsPerPhase;
   const bonding = getBondingSelectionForCable(selected, {
     totalAmpacity,
@@ -1125,12 +1155,15 @@ function runCableCalc() {
   vdEl.textContent = vd_pct.toFixed(2) + '%';
   vdEl.className = 'calc-value ' + (vd_pct > 5 ? 'calc-err' : vd_pct > 3 ? 'calc-warn' : 'calc-ok');
 
-  document.getElementById('cv-ampacity').textContent =
+  const ampacityEl = document.getElementById('cv-ampacity');
+  ampacityEl.textContent =
     ampacity > 0 ? `${totalAmpacity} A (${ampacity} × ${conductorsPerPhase})` : 'N/A (Al <#6)';
+  ampacityEl.className = 'calc-value ' + (ampOk ? 'calc-ok' : 'calc-err');
+  const requiredEl = document.getElementById('cv-required-ampacity');
+  requiredEl.textContent = `${sizingCurrent.toFixed(2)} A`;
+  requiredEl.className = 'calc-value ' + (ampOk ? 'calc-ok' : 'calc-err');
   document.getElementById('cv-parallel').textContent =
     parallelRuns > 0 ? `${parallelRuns}(${phases}${row.size})` : '—';
-  document.getElementById('cv-bonding-rule').textContent = bonding.ruleRef;
-  document.getElementById('cv-bonding-basis').textContent = bonding.basisDescription;
   document.getElementById('cv-bonding-size').textContent = bonding.size;
 
   const statEl = document.getElementById('cv-status');
@@ -1196,23 +1229,17 @@ function enforceRule106165MaxBondingSize(calculatedSize, phaseConductorSize) {
 
 function getBondingSelectionForCable(cableNode, context) {
   const p = cableNode?.props || {};
-  const scope = p.bonding_scope || 'Feeder';
   const bondingMaterial = p.bonding_material || p.material || 'Cu';
   const method = p.bonding_method || 'Overcurrent Device';
   const ocpdAmps = parseFloat(p.ocpd_amps) || 0;
   const largestUngroundedAmpacity = context.totalAmpacity || 0;
 
-  // Rule 10-616(2): service equipment based on largest ungrounded conductor ampacity.
   // Rule 10-616(3): feeder/branch uses OCPD, or largest ungrounded conductor ampacity when upsized for VD.
   let referenceAmps = 0;
   let basisDescription = '—';
-  let ruleRef = 'Rule 10-616(2)/(3) + Table 16';
+  let ruleRef = 'Rule 10-616(3) + Table 16';
 
-  if (scope === 'Service Equipment') {
-    referenceAmps = largestUngroundedAmpacity;
-    basisDescription = `Service: largest ungrounded conductor ampacity (${largestUngroundedAmpacity || 0} A)`;
-    ruleRef = 'Rule 10-616(2) + Table 16';
-  } else if (method === 'Largest Ungrounded (VD Increased)') {
+  if (method === 'Largest Ungrounded (VD Increased)') {
     referenceAmps = largestUngroundedAmpacity;
     basisDescription = `Feeder/Branch (VD increase): largest ungrounded conductor ampacity (${largestUngroundedAmpacity || 0} A)`;
     ruleRef = 'Rule 10-616(3)(b) + Table 16';
