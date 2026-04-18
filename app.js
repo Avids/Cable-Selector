@@ -102,7 +102,7 @@ const COMP_DEFS = {
   utility:     { w:80,  h:80,  label:'Utility',      color:'#89b4fa', titleColor:'#89b4fa',
                  defaults:{name:'UTIL-1', voltage:600, phases:3, fault_kA:25} },
   transformer: { w:80,  h:90,  label:'Transformer',  color:'#cba6f7', titleColor:'#cba6f7',
-                 defaults:{name:'TX-1', kva:75, primary_v:600, secondary_v:208, phases:3, impedance:4.5, conn:'Delta-Wye'} },
+                 defaults:{name:'TX-1', spec:'STEP-DOWN', kva:75, primary_v:600, secondary_v:208, phases:3, impedance:4.5, conn:'Delta-Wye'} },
   panel:       { w:90,  h:80,  label:'Panel',        color:'#94e2d5', titleColor:'#94e2d5',
                  defaults:{name:'MDP', voltage:120, system:'3ph/4w', main_amps:200, short_ckt_kA:10, mfr:'Square D'} },
   breaker:     { w:60,  h:80,  label:'Breaker',      color:'#74c7ec', titleColor:'#74c7ec',
@@ -121,7 +121,7 @@ const COMP_DEFS = {
 
 const FIELD_DEFS = {
   utility:     [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'fault_kA',l:'Fault (kA)',t:'number'}],
-  transformer: [{k:'name',l:'Tag'},{k:'kva',l:'KVA',t:'select',options:TRANSFORMER_KVA_OPTIONS},{k:'primary_v',l:'Primary V',t:'select',options:TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS},{k:'secondary_v',l:'Secondary V',t:'select',options:TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
+  transformer: [{k:'name',l:'Tag'},{k:'spec',l:'Spec',t:'select',options:['STEP-DOWN','STEP-UP']},{k:'kva',l:'KVA',t:'select',options:TRANSFORMER_KVA_OPTIONS},{k:'primary_v',l:'Primary V',t:'select',options:TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS},{k:'secondary_v',l:'Secondary V',t:'select',options:TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS},{k:'phases',l:'Phases',t:'number'},{k:'impedance',l:'%Z',t:'number'},{k:'conn',l:'Connection'}],
   panel:       [{k:'name',l:'Tag'},{k:'voltage',l:'Voltage (V)',t:'select',options:PANEL_VOLTAGE_OPTIONS},{k:'system',l:'System',t:'select',options:SYSTEM_TYPE_OPTIONS},{k:'main_amps',l:'Main Amps',t:'number'},{k:'short_ckt_kA',l:'SCCR (kA)',t:'number'},{k:'mfr',l:'Manufacturer'}],
   breaker:     [{k:'name',l:'Tag'},{k:'amps',l:'Trip (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'system',l:'System',t:'select',options:SYSTEM_TYPE_OPTIONS},{k:'kaic',l:'kAIC',t:'number'},{k:'mfr',l:'Manufacturer'}],
   fuse:        [{k:'name',l:'Tag'},{k:'amps',l:'Rating (A)',t:'number'},{k:'voltage',l:'Voltage (V)',t:'select',options:SYSTEM_VOLTAGE_OPTIONS},{k:'phases',l:'Phase',t:'select',options:PHASE_OPTIONS},{k:'fuse_class',l:'Fuse Class'},{k:'poles',l:'Poles',t:'number'}],
@@ -1300,6 +1300,19 @@ function calculateReviewCurrent(node) {
   return 0;
 }
 
+function calculateTransformerPrimaryCurrent(transformerNode) {
+  const p = transformerNode?.props || {};
+  const kva = parseFloat(p.kva) || 0;
+  const primaryVoltage = parseFloat(p.primary_v) || 0;
+  const phases = Math.max(1, parseInt(p.phases, 10) || 3);
+  if (kva <= 0 || primaryVoltage <= 0) return 0;
+
+  if (phases >= 3) {
+    return (kva * 1000) / (Math.sqrt(3) * primaryVoltage);
+  }
+  return (kva * 1000) / primaryVoltage;
+}
+
 function buildAdjacency() {
   const graph = new Map();
   for (const n of nodes) graph.set(n.id, []);
@@ -1378,6 +1391,16 @@ function reviewCoordination() {
         const pathText = pathNodes.map(n => n.props?.name || COMP_DEFS[n.type].label).join(' → ');
         messages.push(`<li class="review-ok">Path from ${sourceNode?.props?.name || COMP_DEFS[sourceNode?.type || 'panel'].label}: ${pathText}</li>`);
 
+        const transformerOnPath = pathNodes.find(n => n.type === 'transformer');
+        const transformerPrimaryAmps = transformerOnPath ? calculateTransformerPrimaryCurrent(transformerOnPath) : 0;
+        const pathLoadAmps = transformerPrimaryAmps > 0 ? transformerPrimaryAmps : loadAmps;
+        if (transformerOnPath && transformerPrimaryAmps > 0) {
+          const txName = transformerOnPath.props?.name || 'Transformer';
+          const txPrimaryV = parseFloat(transformerOnPath.props?.primary_v) || 0;
+          const txSpec = transformerOnPath.props?.spec || 'STEP-DOWN';
+          messages.push(`<li class="review-ok">Using ${txName} primary-side current for ${txSpec} review: ${transformerPrimaryAmps.toFixed(1)}A @ ${txPrimaryV}V.</li>`);
+        }
+
         const cablesOnPath = pathNodes.filter(n => n.type === 'cable');
         if (cablesOnPath.length === 0) {
           messages.push('<li class="review-warn">△ No cable component on this path to verify conductor sizing.</li>');
@@ -1389,7 +1412,7 @@ function reviewCoordination() {
             const ampacityPerRun = mat === 'al' ? row.al : row.cu;
             const parallelRuns = Math.max(1, parseInt(cp.conductors, 10) || 1);
             const totalAmpacity = ampacityPerRun > 0 ? ampacityPerRun * parallelRuns : 0;
-            const cableLoad = Math.max(parseFloat(cp.amps) || 0, loadAmps);
+            const cableLoad = Math.max(parseFloat(cp.amps) || 0, pathLoadAmps);
             if (ampacityPerRun <= 0) {
               messages.push(`<li class="review-err">✕ ${cp.name || 'Cable'}: size ${cp.size} ${mat.toUpperCase()} has no valid ampacity in table.</li>`);
             } else if (cableLoad > totalAmpacity) {
@@ -1411,12 +1434,12 @@ function reviewCoordination() {
               messages.push(`<li class="review-err">✕ ${name}: missing amp rating.</li>`);
               continue;
             }
-            if (loadAmps > 0 && rating < loadAmps) {
-              messages.push(`<li class="review-err">✕ ${name}: ${rating}A is undersized for ${loadAmps.toFixed(1)}A load.</li>`);
-            } else if (loadAmps > 0 && rating > loadAmps * 2.5) {
-              messages.push(`<li class="review-warn">△ ${name}: ${rating}A appears oversized for ${loadAmps.toFixed(1)}A load.</li>`);
+            if (pathLoadAmps > 0 && rating < pathLoadAmps) {
+              messages.push(`<li class="review-err">✕ ${name}: ${rating}A is undersized for ${pathLoadAmps.toFixed(1)}A load.</li>`);
+            } else if (pathLoadAmps > 0 && rating > pathLoadAmps * 2.5) {
+              messages.push(`<li class="review-warn">△ ${name}: ${rating}A appears oversized for ${pathLoadAmps.toFixed(1)}A load.</li>`);
             } else {
-              messages.push(`<li class="review-ok">✓ ${name}: ${rating}A rating is coordinated with ${loadAmps.toFixed(1)}A load.</li>`);
+              messages.push(`<li class="review-ok">✓ ${name}: ${rating}A rating is coordinated with ${pathLoadAmps.toFixed(1)}A load.</li>`);
             }
           }
         }
