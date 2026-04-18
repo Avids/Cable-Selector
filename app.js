@@ -942,6 +942,10 @@ function setWireRouting(routing) {
   draw();
 }
 
+function showRulesHelp() {
+  document.getElementById('rules-modal')?.classList.add('open');
+}
+
 // ═══════════════════════════════════════════════════
 // ZOOM
 // ═══════════════════════════════════════════════════
@@ -1151,14 +1155,15 @@ function runCableCalc() {
   vdEl.textContent = vd_pct.toFixed(2) + '%';
   vdEl.className = 'calc-value ' + (vd_pct > 5 ? 'calc-err' : vd_pct > 3 ? 'calc-warn' : 'calc-ok');
 
-  document.getElementById('cv-ampacity').textContent =
-    ampacity > 0
-      ? `${totalAmpacity} A (${ampacity} × ${conductorsPerPhase}) / Required ${sizingCurrent.toFixed(2)} A (125%)`
-      : 'N/A (Al <#6)';
+  const ampacityEl = document.getElementById('cv-ampacity');
+  ampacityEl.textContent =
+    ampacity > 0 ? `${totalAmpacity} A (${ampacity} × ${conductorsPerPhase})` : 'N/A (Al <#6)';
+  ampacityEl.className = 'calc-value ' + (ampOk ? 'calc-ok' : 'calc-err');
+  const requiredEl = document.getElementById('cv-required-ampacity');
+  requiredEl.textContent = `${sizingCurrent.toFixed(2)} A`;
+  requiredEl.className = 'calc-value ' + (ampOk ? 'calc-ok' : 'calc-err');
   document.getElementById('cv-parallel').textContent =
     parallelRuns > 0 ? `${parallelRuns}(${phases}${row.size})` : '—';
-  document.getElementById('cv-bonding-rule').textContent = bonding.ruleRef;
-  document.getElementById('cv-bonding-basis').textContent = bonding.basisDescription;
   document.getElementById('cv-bonding-size').textContent = bonding.size;
 
   const statEl = document.getElementById('cv-status');

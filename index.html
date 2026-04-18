@@ -54,6 +54,7 @@
   <div class="sep"></div>
   <button class="tb-btn review" onclick="reviewCoordination()">✓ Review Coordination</button>
   <button class="tb-btn success" onclick="showFeederList()">≡ Feeder Schedule</button>
+  <button class="tb-btn" onclick="showRulesHelp()">ℹ Rules Help</button>
   <div id="status-bar">MODE: SELECT</div>
 </div>
 
@@ -185,9 +186,8 @@
       <div class="calc-row"><span class="calc-label">Voltage Drop</span><span class="calc-value" id="cv-vd">—</span></div>
       <div class="calc-row"><span class="calc-label">VD %</span><span class="calc-value" id="cv-vdpct">—</span></div>
       <div class="calc-row"><span class="calc-label">Ampacity</span><span class="calc-value" id="cv-ampacity">—</span></div>
+      <div class="calc-row"><span class="calc-label">Required (125%)</span><span class="calc-value" id="cv-required-ampacity">—</span></div>
       <div class="calc-row"><span class="calc-label">Parallel Runs (n(c#size))</span><span class="calc-value" id="cv-parallel">—</span></div>
-      <div class="calc-row"><span class="calc-label">Bonding Rule</span><span class="calc-value" id="cv-bonding-rule">—</span></div>
-      <div class="calc-row"><span class="calc-label">Bonding Basis</span><span class="calc-value" id="cv-bonding-basis">—</span></div>
       <div class="calc-row"><span class="calc-label">Bonding Conductor (Table 16)</span><span class="calc-value" id="cv-bonding-size">—</span></div>
       <div class="calc-row"><span class="calc-label">Status</span><span class="calc-value" id="cv-status">—</span></div>
       <button class="calc-btn" onclick="runCableCalc()">↻ Recalculate</button>
@@ -201,6 +201,25 @@
   <div id="zoom-label">100%</div>
   <button class="zoom-btn" onclick="adjustZoom(0.1)">+</button>
   <button class="zoom-btn" title="Reset view" onclick="resetView()">⊙</button>
+</div>
+
+<!-- RULES HELP MODAL -->
+<div class="modal-overlay" id="rules-modal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title">
+      Rules Help (CSA Basis)
+      <span class="modal-close" onclick="document.getElementById('rules-modal').classList.remove('open')">✕</span>
+    </div>
+    <div id="rules-content" style="font-size:12px; color:var(--text2); line-height:1.6; display:grid; gap:8px;">
+      <div><strong>Cable ampacity sizing:</strong> minimum ampacity is based on <strong>125% of load current</strong>.</div>
+      <div><strong>Voltage-drop check:</strong> calculated from entered load current, system type, length, conductor material, and parallel runs.</div>
+      <div><strong>Bonding conductor sizing:</strong> calculated per CSA Table 16 method and shown as a separate result.</div>
+      <div><strong>Status:</strong> PASS only when ampacity and voltage-drop checks are both acceptable.</div>
+    </div>
+    <div class="modal-actions">
+      <button class="tb-btn" onclick="document.getElementById('rules-modal').classList.remove('open')">Close</button>
+    </div>
+  </div>
 </div>
 
 <!-- FEEDER MODAL -->
