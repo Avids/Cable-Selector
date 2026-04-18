@@ -2,25 +2,27 @@
 // DATA
 // ═══════════════════════════════════════════════════
 
+const CABLE_TERMINATION_TEMP_C = 75;
 const CABLE_DATA = [
-  {size:'#14', area:2.08,  cu:15,  al:0   },
-  {size:'#12', area:3.31,  cu:20,  al:0   },
-  {size:'#10', area:5.26,  cu:30,  al:0   },
-  {size:'#8',  area:8.37,  cu:50,  al:0   },
-  {size:'#6',  area:13.3,  cu:55,  al:40  },
-  {size:'#4',  area:21.1,  cu:70,  al:55  },
-  {size:'#2',  area:33.6,  cu:95,  al:75  },
-  {size:'#1',  area:42.4,  cu:110, al:85  },
-  {size:'#1/0', area:53.5,  cu:125, al:100 },
-  {size:'#2/0', area:67.4,  cu:145, al:115 },
-  {size:'#3/0', area:85.0,  cu:165, al:130 },
-  {size:'#4/0', area:107.0, cu:195, al:150 },
-  {size:'#250', area:127.0, cu:215, al:170 },
-  {size:'#300', area:152.0, cu:240, al:190 },
-  {size:'#350', area:177.0, cu:260, al:210 },
-  {size:'#400', area:203.0, cu:280, al:225 },
-  {size:'#500', area:253.0, cu:320, al:260 },
-  {size:'#600', area:304.0, cu:355, al:285 },
+  // Ampacity basis: 75°C terminations for wire selection.
+  {size:'#14', area:2.08,  cu:20,  al:0   },
+  {size:'#12', area:3.31,  cu:25,  al:0   },
+  {size:'#10', area:5.26,  cu:35,  al:0   },
+  {size:'#8',  area:8.37,  cu:50,  al:40  },
+  {size:'#6',  area:13.3,  cu:65,  al:50  },
+  {size:'#4',  area:21.1,  cu:85,  al:65  },
+  {size:'#2',  area:33.6,  cu:115, al:90  },
+  {size:'#1',  area:42.4,  cu:130, al:100 },
+  {size:'#1/0', area:53.5,  cu:150, al:120 },
+  {size:'#2/0', area:67.4,  cu:175, al:135 },
+  {size:'#3/0', area:85.0,  cu:200, al:155 },
+  {size:'#4/0', area:107.0, cu:230, al:180 },
+  {size:'#250', area:127.0, cu:255, al:205 },
+  {size:'#300', area:152.0, cu:285, al:230 },
+  {size:'#350', area:177.0, cu:310, al:250 },
+  {size:'#400', area:203.0, cu:335, al:270 },
+  {size:'#500', area:253.0, cu:380, al:310 },
+  {size:'#600', area:304.0, cu:420, al:340 },
 ];
 
 // CSA C22.1:24 Table 16 — Bonding conductor size lookup ("Not exceeding" column).
@@ -212,19 +214,35 @@ function toScreen(wx, wy) {
   return { x: wx * zoom + pan.x, y: wy * zoom + pan.y };
 }
 
+function getConnectionFrame(n) {
+  const d = COMP_DEFS[n.type];
+  if (canvasStyle !== 'engineering') {
+    return { x: n.x, y: n.y, w: d.w, h: d.h };
+  }
+
+  const framePadX = 6;
+  const framePadY = 4;
+  return {
+    x: n.x + framePadX,
+    y: n.y + 8 + framePadY,
+    w: d.w - framePadX * 2,
+    h: d.h - 24 - framePadY * 2,
+  };
+}
+
 // ═══════════════════════════════════════════════════
 // PORTS
 // ═══════════════════════════════════════════════════
 
 function getPorts(n) {
-  const d = COMP_DEFS[n.type];
-  const cx = n.x + d.w / 2;
-  const cy = n.y + d.h / 2;
+  const frame = getConnectionFrame(n);
+  const cx = frame.x + frame.w / 2;
+  const cy = frame.y + frame.h / 2;
   return [
-    { id: 'T', x: cx,      y: n.y       },
-    { id: 'B', x: cx,      y: n.y + d.h },
-    { id: 'L', x: n.x,     y: cy        },
-    { id: 'R', x: n.x+d.w, y: cy        },
+    { id: 'T', x: cx,              y: frame.y           },
+    { id: 'B', x: cx,              y: frame.y + frame.h },
+    { id: 'L', x: frame.x,         y: cy                },
+    { id: 'R', x: frame.x+frame.w, y: cy                },
   ];
 }
 
@@ -390,6 +408,12 @@ function drawNode(n, isSel, isHov) {
     ctx.fillStyle = '#8a1111';
     ctx.lineWidth = 1.6 / zoom;
     drawSymbol(ctx, n.type, x, y + 8/zoom, w, h - 24/zoom, zoom);
+
+    const frame = getConnectionFrame(n);
+    ctx.lineWidth = 1 / zoom;
+    ctx.setLineDash([4 / zoom, 3 / zoom]);
+    ctx.strokeRect(frame.x, frame.y, frame.w, frame.h);
+    ctx.setLineDash([]);
 
     const textX = x + w + 8;
     const textY = y + 2;
@@ -1157,7 +1181,7 @@ function runCableCalc() {
 
   const ampacityEl = document.getElementById('cv-ampacity');
   ampacityEl.textContent =
-    ampacity > 0 ? `${totalAmpacity} A (${ampacity} × ${conductorsPerPhase})` : 'N/A (Al <#6)';
+    ampacity > 0 ? `${totalAmpacity} A (${ampacity} × ${conductorsPerPhase}, ${CABLE_TERMINATION_TEMP_C}°C term)` : 'N/A (no value)';
   ampacityEl.className = 'calc-value ' + (ampOk ? 'calc-ok' : 'calc-err');
   const requiredEl = document.getElementById('cv-required-ampacity');
   requiredEl.textContent = `${sizingCurrent.toFixed(2)} A`;
