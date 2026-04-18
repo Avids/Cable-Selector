@@ -3,27 +3,6 @@
 // ═══════════════════════════════════════════════════
 
 const CABLE_TERMINATION_TEMP_C = 75;
-const CABLE_DATA = [
-  // Ampacity basis: 75°C terminations for wire selection.
-  {size:'#14', area:2.08,  cu:20,  al:0   },
-  {size:'#12', area:3.31,  cu:25,  al:0   },
-  {size:'#10', area:5.26,  cu:35,  al:0   },
-  {size:'#8',  area:8.37,  cu:50,  al:40  },
-  {size:'#6',  area:13.3,  cu:65,  al:50  },
-  {size:'#4',  area:21.1,  cu:85,  al:65  },
-  {size:'#2',  area:33.6,  cu:115, al:90  },
-  {size:'#1',  area:42.4,  cu:130, al:100 },
-  {size:'#1/0', area:53.5,  cu:150, al:120 },
-  {size:'#2/0', area:67.4,  cu:175, al:135 },
-  {size:'#3/0', area:85.0,  cu:200, al:155 },
-  {size:'#4/0', area:107.0, cu:230, al:180 },
-  {size:'#250', area:127.0, cu:255, al:205 },
-  {size:'#300', area:152.0, cu:285, al:230 },
-  {size:'#350', area:177.0, cu:310, al:250 },
-  {size:'#400', area:203.0, cu:335, al:270 },
-  {size:'#500', area:253.0, cu:380, al:310 },
-  {size:'#600', area:304.0, cu:420, al:340 },
-];
 
 // CSA C22.1:24 Table 16 — Bonding conductor size lookup ("Not exceeding" column).
 // Selection is step-based: choose first row where reference amps <= row.max.
@@ -77,6 +56,7 @@ const CONDUCTOR_AREA_MM2 = {
 
 const BONDING_SCOPE_OPTIONS = ['Feeder/Branch'];
 const BONDING_METHOD_OPTIONS = ['Overcurrent Device', 'Largest Ungrounded (VD Increased)'];
+const CABLE_TERMINATION_OPTIONS = [60, 75, 90];
 
 const TRANSFORMER_PRIMARY_VOLTAGE_OPTIONS = [600, 480, 208];
 const TRANSFORMER_SECONDARY_VOLTAGE_OPTIONS = [480, 208];
@@ -112,7 +92,7 @@ const COMP_DEFS = {
   bus:         { w:110, h:50,  label:'Bus Bar',      color:'#f9e2af', titleColor:'#f9e2af',
                  defaults:{name:'BUS-1', voltage:120, amps:400, phases:3} },
   cable:       { w:90,  h:60,  label:'Cable',        color:'#a6e3a1', titleColor:'#a6e3a1',
-                 defaults:{name:'CAB-1', conductors:1, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120, system:'3ph/4w', bonding_scope:'Feeder/Branch', bonding_method:'Overcurrent Device', ocpd_amps:20, bonding_material:'Cu'} },
+                 defaults:{name:'CAB-1', conductors:1, size:'#12', insulation:'RW90', length:10, material:'Cu', termination_temp:CABLE_TERMINATION_TEMP_C, amps:20, voltage:120, system:'3ph/4w', bonding_scope:'Feeder/Branch', bonding_method:'Overcurrent Device', ocpd_amps:20, bonding_material:'Cu'} },
   load:        { w:60,  h:80,  label:'Load',         color:'#f38ba8', titleColor:'#f38ba8',
                  defaults:{name:'LOAD-1', current:20, voltage:120, phases:1} },
   meter:       { w:70,  h:70,  label:'Meter',        color:'#b4befe', titleColor:'#b4befe',
@@ -130,6 +110,7 @@ const FIELD_DEFS = {
   {k:'name',l:'Tag'},
   {k:'size',l:'Size', t:'select', options: CABLE_DATA.map(d => d.size)}, // Changed to select
   {k:'material',l:'Material',t:'select',options:['Cu','Al']},
+  {k:'termination_temp',l:'Termination Temp (°C)',t:'select',options:CABLE_TERMINATION_OPTIONS},
   {k:'conductors',l:'# Cond / Phase',t:'number'},
   {k:'insulation',l:'Insulation'},
   {k:'length',l:'Length (m)',t:'number'},
@@ -1080,7 +1061,20 @@ function getCableRow(size) {
   return CABLE_DATA.find(r => r.size.replace(/^#/, '') === strippedInput) || CABLE_DATA[1];
 }
 
-function getMinimumCableSizeForLoad(loadAmps, material, conductorsPerPhase = 1) {
+function getCableAmpacity(row, material, terminationTemp = CABLE_TERMINATION_TEMP_C) {
+  const mat = String(material || 'Cu').toLowerCase().startsWith('al') ? 'al' : 'cu';
+  const temp = Number(terminationTemp) || CABLE_TERMINATION_TEMP_C;
+  const table = mat === 'al' ? row?.al : row?.cu;
+  if (!table) return 0;
+  return Number(table[temp]) || 0;
+}
+
+function formatAmpacityDisplay(totalAmpacity, baseAmpacity, conductorsPerPhase, terminationTemp) {
+  if (!(baseAmpacity > 0)) return 'N/A (no value)';
+  return `${totalAmpacity} A (${baseAmpacity} × ${conductorsPerPhase}, ${terminationTemp}°C term)`;
+}
+
+function getMinimumCableSizeForLoad(loadAmps, material, conductorsPerPhase = 1, terminationTemp = CABLE_TERMINATION_TEMP_C) {
   const load = Number(loadAmps);
   if (!Number.isFinite(load) || load <= 0) return null;
 
@@ -1089,7 +1083,7 @@ function getMinimumCableSizeForLoad(loadAmps, material, conductorsPerPhase = 1) 
   const conductors = Math.max(1, parseInt(conductorsPerPhase, 10) || 1);
 
   for (const row of CABLE_DATA) {
-    const ampacity = mat === 'al' ? row.al : row.cu;
+    const ampacity = getCableAmpacity(row, mat, terminationTemp);
     if (!ampacity || ampacity <= 0) continue;
     if (ampacity * conductors >= requiredAmpacity) return row.size;
   }
@@ -1154,6 +1148,7 @@ function runCableCalc() {
   const sizingCurrent = I * 1.25;
   const L = p.length || 1;
   const mat = (p.material || 'Cu').toLowerCase().startsWith('al') ? 'al' : 'cu';
+  const terminationTemp = Number(p.termination_temp) || CABLE_TERMINATION_TEMP_C;
   const row = getCableRow(p.size);
   const A = row.area;
   const rho = mat === 'al' ? 0.0282 : 0.0172; // Ω·mm²/m
@@ -1164,7 +1159,7 @@ function runCableCalc() {
   const vd = (factor * I * R * L) / conductorsPerPhase;
   const vd_pct = V > 0 ? (vd / V * 100) : 0;
 
-  const ampacity = mat === 'al' ? row.al : row.cu;
+  const ampacity = getCableAmpacity(row, mat, terminationTemp);
   const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
   const ampOk = totalAmpacity > 0 && sizingCurrent <= totalAmpacity;
   const parallelRuns = conductorsPerPhase;
@@ -1180,8 +1175,7 @@ function runCableCalc() {
   vdEl.className = 'calc-value ' + (vd_pct > 5 ? 'calc-err' : vd_pct > 3 ? 'calc-warn' : 'calc-ok');
 
   const ampacityEl = document.getElementById('cv-ampacity');
-  ampacityEl.textContent =
-    ampacity > 0 ? `${totalAmpacity} A (${ampacity} × ${conductorsPerPhase}, ${CABLE_TERMINATION_TEMP_C}°C term)` : 'N/A (no value)';
+  ampacityEl.textContent = formatAmpacityDisplay(totalAmpacity, ampacity, conductorsPerPhase, terminationTemp);
   ampacityEl.className = 'calc-value ' + (ampOk ? 'calc-ok' : 'calc-err');
   const requiredEl = document.getElementById('cv-required-ampacity');
   requiredEl.textContent = `${sizingCurrent.toFixed(2)} A`;
@@ -1354,14 +1348,15 @@ function reviewCoordination() {
           const cp = cable.props || {};
           const row = getCableRow(cp.size);
           const mat = (cp.material || 'Cu').toLowerCase().startsWith('al') ? 'al' : 'cu';
-          const ampacity = mat === 'al' ? row.al : row.cu;
+          const terminationTemp = Number(cp.termination_temp) || CABLE_TERMINATION_TEMP_C;
+          const ampacity = getCableAmpacity(row, mat, terminationTemp);
           const cableLoad = Math.max(parseFloat(cp.amps) || 0, loadAmps);
           if (ampacity <= 0) {
             messages.push(`<li class="review-err">✕ ${cp.name || 'Cable'}: size ${cp.size} ${mat.toUpperCase()} has no valid ampacity in table.</li>`);
           } else if (cableLoad > ampacity) {
             messages.push(`<li class="review-err">✕ ${cp.name || 'Cable'}: ${cableLoad.toFixed(1)}A load exceeds ${ampacity}A ampacity.</li>`);
           } else {
-            messages.push(`<li class="review-ok">✓ ${cp.name || 'Cable'}: ${cp.size} ${mat.toUpperCase()} supports ${cableLoad.toFixed(1)}A (ampacity ${ampacity}A).</li>`);
+            messages.push(`<li class="review-ok">✓ ${cp.name || 'Cable'}: ${cp.size} ${mat.toUpperCase()} supports ${cableLoad.toFixed(1)}A (ampacity ${ampacity}A @ ${terminationTemp}°C).</li>`);
           }
         }
       }
@@ -1427,6 +1422,7 @@ function showFeederList() {
     const I = p.amps || 0;
     const L = p.length || 1;
     const mat = (p.material || 'Cu').toLowerCase().startsWith('al') ? 'al' : 'cu';
+    const terminationTemp = Number(p.termination_temp) || CABLE_TERMINATION_TEMP_C;
     const row = getCableRow(p.size);
     const A = row.area;
     const rho = mat === 'al' ? 0.0282 : 0.0172;
@@ -1437,7 +1433,7 @@ function showFeederList() {
     const conductorsPerPhase = Math.max(1, parseInt(p.conductors, 10) || 1);
     const vd = (factor * I * R * L) / conductorsPerPhase;
     const vd_pct = V > 0 ? (vd / V * 100) : 0;
-    const ampacity = mat === 'al' ? row.al : row.cu;
+    const ampacity = getCableAmpacity(row, mat, terminationTemp);
     const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
     const bonding = getBondingSelectionForCable(c, {
       totalAmpacity,
@@ -1459,7 +1455,7 @@ function showFeederList() {
       <td>${system}</td>
       <td>${V} V / ${phases}Ø</td>
       <td>${I} A</td>
-      <td>${totalAmpacity>0?totalAmpacity+'A':'N/A'} <span class="badge ${ampClass}">${ampText}</span></td>
+      <td>${totalAmpacity>0?`${totalAmpacity}A @ ${terminationTemp}°C`:'N/A'} <span class="badge ${ampClass}">${ampText}</span></td>
       <td>${vd.toFixed(2)}V / ${vd_pct.toFixed(2)}% <span class="badge ${vdClass}">${vdText}</span></td>
     </tr>`;
   }
@@ -1478,7 +1474,7 @@ function showFeederList() {
 
 function exportCSV() {
   const cables = nodes.filter(n => n.type === 'cable');
-  let csv = 'Tag,From,To,Conductors,Size,Material,Insulation,Length(m),System,Voltage(V),Phases,Load(A),Ampacity(A),VD(V),VD(%),Status\n';
+  let csv = 'Tag,From,To,Conductors,Size,Material,TerminationTemp(C),Insulation,Length(m),System,Voltage(V),Phases,Load(A),Ampacity(A),VD(V),VD(%),Status\n';
   for (const c of cables) {
     const p = c.props;
     const { from, to } = getCableEndpoints(c);
@@ -1486,6 +1482,7 @@ function exportCSV() {
     const I = p.amps || 0;
     const L = p.length || 1;
     const mat = (p.material || 'Cu').toLowerCase().startsWith('al') ? 'al' : 'cu';
+    const terminationTemp = Number(p.termination_temp) || CABLE_TERMINATION_TEMP_C;
     const row = getCableRow(p.size);
     const A = row.area;
     const rho = mat === 'al' ? 0.0282 : 0.0172;
@@ -1496,11 +1493,11 @@ function exportCSV() {
     const conductorsPerPhase = Math.max(1, parseInt(p.conductors, 10) || 1);
     const vd = (factor * I * R * L) / conductorsPerPhase;
     const vd_pct = V > 0 ? (vd / V * 100) : 0;
-    const ampacity = mat === 'al' ? row.al : row.cu;
+    const ampacity = getCableAmpacity(row, mat, terminationTemp);
     const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
     const ampOk = totalAmpacity <= 0 || I <= totalAmpacity;
     const status = !ampOk ? 'OVERLOAD' : vd_pct > 5 ? 'VD_FAIL' : vd_pct > 3 ? 'VD_CHECK' : 'PASS';
-    csv += `${p.name||''},${from},${to},${p.conductors||1},${p.size},${mat.toUpperCase()},${p.insulation||''},${L},${system},${V},${phases},${I},${totalAmpacity>0?totalAmpacity:'N/A'},${vd.toFixed(3)},${vd_pct.toFixed(2)},${status}\n`;
+    csv += `${p.name||''},${from},${to},${p.conductors||1},${p.size},${mat.toUpperCase()},${terminationTemp},${p.insulation||''},${L},${system},${V},${phases},${I},${totalAmpacity>0?totalAmpacity:'N/A'},${vd.toFixed(3)},${vd_pct.toFixed(2)},${status}\n`;
   }
   const a = document.createElement('a');
   a.href = 'data:text/csv,' + encodeURIComponent(csv);
