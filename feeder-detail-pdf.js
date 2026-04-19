@@ -98,6 +98,7 @@ function exportFeederDetailPDF(cableId) {
   const { from, to } = getCableEndpoints(cableNode);
   const metrics = calculateCableMetrics(cableNode);
   const system = p.system || '—';
+  const terminationTemp = Number(p.termination_temp) || CABLE_TERMINATION_TEMP_C;
   const loadType = 'Continuous';
   const loadFactor = 1.25; // Rule 8-104 continuous load basis.
   const requiredAmpacity = metrics.I * loadFactor;
@@ -122,6 +123,7 @@ function exportFeederDetailPDF(cableId) {
     `Conductor Per Phase: ${metrics.conductorsPerPhase}`,
     `Conductor Size: ${p.size || '—'}`,
     `Insulation: ${p.insulation || '—'}`,
+    `Termination Temperature: ${terminationTemp}°C`,
     `Load Type: ${loadType}`,
     `Length of Cable Run: ${metrics.L.toFixed(2)} m`,
     `Voltage: ${metrics.V.toFixed(2)} V`,
@@ -148,12 +150,6 @@ function exportFeederDetailPDF(cableId) {
     'Rule 10-616(3)(a): Bonding conductor sizing',
     'Table 16: Bonding conductor size',
     'Appendix D Table D3: Voltage drop calculation',
-    '',
-    'Engineering Assumptions',
-    'Assumptions:',
-    '- 75°C terminations',
-    '- Conductors installed in raceway',
-    '- Load type: continuous',
     '',
     disclaimer
   ];
