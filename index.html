@@ -231,10 +231,9 @@
       Feeder / Cable Schedule
       <span class="modal-close" onclick="document.getElementById('feeder-modal').classList.remove('open')">✕</span>
     </div>
-    <div class="modal-subtitle">CSA C22.1 — Voltage drop limit: 3% branch / 5% feeder. Ampacity per Table 2 (75°C terminations).</div>
+    <div class="modal-subtitle">CSA C22.1 — Voltage drop limit: 3% branch / 5% feeder. Ampacity per Table 2 (75°C terminations). Use the PDF button per feeder for detailed calculations.</div>
     <div id="feeder-content"></div>
     <div class="modal-actions">
-      <button class="tb-btn" onclick="exportCSV()">↓ Export CSV</button>
       <button class="tb-btn" onclick="document.getElementById('feeder-modal').classList.remove('open')">Close</button>
     </div>
   </div>
@@ -256,5 +255,6 @@
 </div>
 
 <script src="app.js"></script>
+<script src="feeder-detail-pdf.js"></script>
 </body>
 </html>

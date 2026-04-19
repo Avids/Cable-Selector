@@ -1578,6 +1578,7 @@ function showFeederList() {
       <td>${I} A</td>
       <td>${totalAmpacity>0?totalAmpacity+'A':'N/A'} <span class="badge ${ampClass}">${ampText}</span></td>
       <td>${vd.toFixed(2)}V / ${vd_pct.toFixed(2)}% <span class="badge ${vdClass}">${vdText}</span></td>
+      <td><button class="tb-btn" onclick="exportFeederDetailPDF(${c.id})">PDF</button></td>
     </tr>`;
   }
 
@@ -1586,7 +1587,7 @@ function showFeederList() {
       <thead><tr>
         <th>Tag</th><th>From</th><th>To</th><th>CONDUCTOR PER PH</th><th>BONDING WIRE</th><th>Insulation</th>
         <th>Length</th><th>System</th><th>Voltage / Phase</th><th>Load</th>
-        <th>Ampacity</th><th>Voltage Drop</th>
+        <th>Ampacity</th><th>Voltage Drop</th><th>Detail</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
