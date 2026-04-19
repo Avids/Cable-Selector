@@ -152,11 +152,22 @@ function createStyledPdfBlob(entries, options = {}) {
   let nextObjectId = 5;
 
   for (const pageContent of pages) {
+    const pageIndex = pageObjectIds.length + 1;
+    const footerText = `Page ${pageIndex} of ${pages.length}`;
+    const footerBlock = [
+      'BT',
+      '/F1 9 Tf',
+      '0.420 0.440 0.520 rg',
+      `${(pageWidth - 120).toFixed(2)} 24.00 Td`,
+      `(${escapePdfText(footerText)}) Tj`,
+      'ET',
+    ].join('\n');
+    const pageWithFooter = pageContent ? `${pageContent}\n${footerBlock}` : footerBlock;
     const contentId = nextObjectId++;
     const pageId = nextObjectId++;
     contentObjectIds.push(contentId);
     pageObjectIds.push(pageId);
-    objects.push(`${contentId} 0 obj\n<< /Length ${pageContent.length} >>\nstream\n${pageContent}\nendstream\nendobj\n`);
+    objects.push(`${contentId} 0 obj\n<< /Length ${pageWithFooter.length} >>\nstream\n${pageWithFooter}\nendstream\nendobj\n`);
     objects.push(`${pageId} 0 obj\n<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Contents ${contentId} 0 R /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> >>\nendobj\n`);
   }
 
@@ -367,7 +378,7 @@ function exportFeederSchedulePDF() {
     entries.push({ text: `From: ${from}   To: ${to}`, indent: 1 });
     entries.push({ text: `Conductor: ${conductorCount} x ${p.size || 'N/A'} ${mat}   Insulation: ${p.insulation || '—'}`, indent: 1 });
     entries.push({ text: `Termination Temp: ${Number(p.termination_temp) || CABLE_TERMINATION_TEMP_C} C   Length: ${L} m`, indent: 1 });
-    entries.push({ text: `System: ${p.system || '—'}   Voltage/Phase: ${V} V / ${phases}O   Load: ${I} A`, indent: 1 });
+    entries.push({ text: `System: ${p.system || '—'}   Voltage/Phase: ${V} V / ${phases}PH   Load: ${I} A`, indent: 1 });
     entries.push({ text: `Ampacity: ${totalAmpacity > 0 ? `${totalAmpacity}A` : 'N/A'} (${ampStatus})   Voltage Drop: ${vd.toFixed(2)}V / ${vdPct.toFixed(2)}% (${vdStatus})`, indent: 1 });
     entries.push({ text: '', indent: 0 });
   });
