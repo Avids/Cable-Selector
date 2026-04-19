@@ -353,6 +353,7 @@ function exportFeederSchedulePDF() {
     { text: `Generated: ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC`, indent: 0 },
     { text: '', indent: 0 },
   ];
+  const joinFields = (...fields) => fields.filter(Boolean).join(',\t');
 
   cables.forEach((cable) => {
     const p = cable.props || {};
@@ -375,11 +376,11 @@ function exportFeederSchedulePDF() {
     const vdStatus = vdPct > 5 ? 'FAIL' : vdPct > 3 ? 'CHECK' : 'OK';
 
     entries.push({ text: p.name || `CAB-${cable.id}`, bold: true, indent: 0 });
-    entries.push({ text: `From: ${from}   To: ${to}`, indent: 1 });
-    entries.push({ text: `Conductor: ${conductorCount} x ${p.size || 'N/A'} ${mat}   Insulation: ${p.insulation || '—'}`, indent: 1 });
-    entries.push({ text: `Termination Temp: ${Number(p.termination_temp) || CABLE_TERMINATION_TEMP_C} C   Length: ${L} m`, indent: 1 });
-    entries.push({ text: `System: ${p.system || '—'}   Voltage/Phase: ${V} V / ${phases}PH   Load: ${I} A`, indent: 1 });
-    entries.push({ text: `Ampacity: ${totalAmpacity > 0 ? `${totalAmpacity}A` : 'N/A'} (${ampStatus})   Voltage Drop: ${vd.toFixed(2)}V / ${vdPct.toFixed(2)}% (${vdStatus})`, indent: 1 });
+    entries.push({ text: joinFields(`From: ${from}`, `To: ${to}`), indent: 1 });
+    entries.push({ text: joinFields(`Conductor: ${conductorCount} x ${p.size || 'N/A'} ${mat}`, `Insulation: ${p.insulation || '—'}`), indent: 1 });
+    entries.push({ text: joinFields(`Termination Temp: ${Number(p.termination_temp) || CABLE_TERMINATION_TEMP_C} C`, `Length: ${L} m`), indent: 1 });
+    entries.push({ text: joinFields(`System: ${p.system || '—'}`, `Voltage/Phase: ${V} V / ${phases}PH`, `Load: ${I} A`), indent: 1 });
+    entries.push({ text: joinFields(`Ampacity: ${totalAmpacity > 0 ? `${totalAmpacity}A` : 'N/A'} (${ampStatus})`, `Voltage Drop: ${vd.toFixed(2)}V / ${vdPct.toFixed(2)}% (${vdStatus})`), indent: 1 });
     entries.push({ text: '', indent: 0 });
   });
 
