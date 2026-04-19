@@ -368,11 +368,11 @@ function draw() {
         const isHover = hoverPortInfo && hoverPortInfo.node === n && hoverPortInfo.port.id === p.id;
         ctx.beginPath();
         ctx.arc(p.x, p.y, isHover ? 7/zoom : 4/zoom, 0, Math.PI * 2);
-        ctx.strokeStyle = canvasStyle === 'engineering' ? '#7f1919' : '#89b4fa';
+        ctx.strokeStyle = canvasStyle === 'engineering' ? '#1f6fb2' : '#89b4fa';
         ctx.lineWidth = 1.5 / zoom;
         ctx.stroke();
         if (isHover) {
-          ctx.fillStyle = canvasStyle === 'engineering' ? 'rgba(127,25,25,0.2)' : 'rgba(137,180,250,0.3)';
+          ctx.fillStyle = canvasStyle === 'engineering' ? 'rgba(31,111,178,0.2)' : 'rgba(137,180,250,0.3)';
           ctx.fill();
         }
       }
@@ -385,7 +385,7 @@ function draw() {
 function drawWire(pa, pb, selected, wire = null) {
   const points = getWirePolylinePoints(pa, pb, wire);
   ctx.beginPath();
-  const defaultWire = canvasStyle === 'engineering' ? '#34495e' : '#3d4166';
+  const defaultWire = canvasStyle === 'engineering' ? '#1f6fb2' : '#3d4166';
   const selectedWire = canvasStyle === 'engineering' ? '#1f6fb2' : '#89b4fa';
   ctx.strokeStyle = selected ? selectedWire : defaultWire;
   ctx.lineWidth = (selected ? 2 : 1.5) / zoom;
@@ -396,7 +396,7 @@ function drawWire(pa, pb, selected, wire = null) {
   ctx.stroke();
 
   // Junction dots
-  ctx.fillStyle = selected ? selectedWire : (canvasStyle === 'engineering' ? '#34495e' : '#6c7086');
+  ctx.fillStyle = selected ? selectedWire : (canvasStyle === 'engineering' ? '#1f6fb2' : '#6c7086');
   ctx.beginPath(); ctx.arc(pa.x, pa.y, 3/zoom, 0, Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.arc(pb.x, pb.y, 3/zoom, 0, Math.PI*2); ctx.fill();
 
@@ -440,15 +440,15 @@ function drawNode(n, isSel, isHov) {
 
   if (canvasStyle === 'engineering') {
     if (isSel) {
-      ctx.strokeStyle = '#bf2d2d';
+      ctx.strokeStyle = '#000000';
       ctx.lineWidth = 1.4 / zoom;
       ctx.setLineDash([5 / zoom, 3 / zoom]);
       ctx.strokeRect(x - 6 / zoom, y - 6 / zoom, w + 12 / zoom, h + 12 / zoom);
       ctx.setLineDash([]);
     }
 
-    ctx.strokeStyle = '#8a1111';
-    ctx.fillStyle = '#8a1111';
+    ctx.strokeStyle = '#000000';
+    ctx.fillStyle = '#000000';
     ctx.lineWidth = 1.6 / zoom;
     drawSymbol(ctx, n.type, x, y + 8/zoom, w, h - 24/zoom, zoom);
 
@@ -464,7 +464,7 @@ function drawNode(n, isSel, isHov) {
     const meta = getEngineeringMeta(n);
 
     ctx.textAlign = 'left';
-    ctx.fillStyle = '#7f1919';
+    ctx.fillStyle = '#000000';
     ctx.textBaseline = 'top';
     ctx.font = `700 11px "IBM Plex Mono", monospace`;
     ctx.fillText(name, textX, textY);
@@ -1826,8 +1826,8 @@ function buildPrintSvg(bounds) {
   const height = Math.max(1, Math.ceil(bounds.maxY - bounds.minY + margin * 2));
   const offsetX = margin - bounds.minX;
   const offsetY = margin - bounds.minY;
-  const wireStroke = canvasStyle === 'engineering' ? '#34495e' : '#3d4166';
-  const nodeStroke = canvasStyle === 'engineering' ? '#8a1111' : '#2e3155';
+  const wireStroke = canvasStyle === 'engineering' ? '#1f6fb2' : '#3d4166';
+  const nodeStroke = canvasStyle === 'engineering' ? '#000000' : '#2e3155';
   const nodeFill = canvasStyle === 'engineering' ? '#ffffff' : '#1e2030';
 
   const wireSvg = wires.map(wire => {
