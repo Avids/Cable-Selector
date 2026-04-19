@@ -87,6 +87,103 @@ function createPdfBlobFromLines(lines) {
   return new Blob([pdf], { type: 'application/pdf' });
 }
 
+function createStyledPdfBlob(entries) {
+  const pageWidth = 612;
+  const pageHeight = 792;
+  const marginX = 48;
+  const topY = 770;
+  const bottomMargin = 48;
+  const lineHeight = 14;
+
+  const sanitize = (value) => String(value || '')
+    .replace(/✓/g, 'OK')
+    .replace(/[✕✖]/g, 'X')
+    .replace(/△/g, '!')
+    .replace(/⚠/g, '!')
+    .replace(/→/g, '->')
+    .replace(/×/g, 'x')
+    .replace(/•/g, '-')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const escapeText = (value) => escapePdfText(sanitize(value));
+  const maxChars = 92;
+  const pages = [];
+  let currentPage = [];
+  let y = topY;
+
+  const ensurePageSpace = (requiredLines = 1) => {
+    if (y - requiredLines * lineHeight < bottomMargin) {
+      pages.push(currentPage.join('\n'));
+      currentPage = [];
+      y = topY;
+    }
+  };
+
+  for (const entry of entries) {
+    const text = sanitize(entry.text);
+    const wrappedLines = wrapPdfLine(text, maxChars);
+    ensurePageSpace(wrappedLines.length);
+    for (const [lineIndex, line] of wrappedLines.entries()) {
+      const lineIndent = lineIndex === 0 ? (entry.indent || 0) : Math.max(entry.indent || 0, 1);
+      const x = marginX + lineIndent * 16;
+      const rgb = entry.color || [0.12, 0.13, 0.20];
+      const font = entry.bold ? '/F2 10 Tf' : '/F1 10 Tf';
+      currentPage.push('BT');
+      currentPage.push(font);
+      currentPage.push(`${rgb[0].toFixed(3)} ${rgb[1].toFixed(3)} ${rgb[2].toFixed(3)} rg`);
+      currentPage.push(`${x.toFixed(2)} ${y.toFixed(2)} Td`);
+      currentPage.push(`(${escapeText(line)}) Tj`);
+      currentPage.push('ET');
+      y -= lineHeight;
+    }
+  }
+  pages.push(currentPage.join('\n'));
+
+  const objects = [];
+  const pageObjectIds = [];
+  const contentObjectIds = [];
+  const catalogId = 1;
+  const pagesId = 2;
+  const fontRegularId = 3;
+  const fontBoldId = 4;
+  let nextObjectId = 5;
+
+  for (const pageContent of pages) {
+    const contentId = nextObjectId++;
+    const pageId = nextObjectId++;
+    contentObjectIds.push(contentId);
+    pageObjectIds.push(pageId);
+    objects.push(`${contentId} 0 obj\n<< /Length ${pageContent.length} >>\nstream\n${pageContent}\nendstream\nendobj\n`);
+    objects.push(`${pageId} 0 obj\n<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Contents ${contentId} 0 R /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> >>\nendobj\n`);
+  }
+
+  const kids = pageObjectIds.map(id => `${id} 0 R`).join(' ');
+  const fixedObjects = [
+    `${catalogId} 0 obj\n<< /Type /Catalog /Pages ${pagesId} 0 R >>\nendobj\n`,
+    `${pagesId} 0 obj\n<< /Type /Pages /Kids [${kids}] /Count ${pageObjectIds.length} >>\nendobj\n`,
+    `${fontRegularId} 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n`,
+    `${fontBoldId} 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n`,
+  ];
+
+  const allObjects = [...fixedObjects, ...objects];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  for (const obj of allObjects) {
+    offsets.push(pdf.length);
+    pdf += obj;
+  }
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${allObjects.length + 1}\n`;
+  pdf += '0000000000 65535 f \n';
+  for (let i = 1; i <= allObjects.length; i += 1) {
+    pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${allObjects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return new Blob([pdf], { type: 'application/pdf' });
+}
+
 function exportFeederDetailPDF(cableId) {
   const cableNode = nodes.find(n => n.id === cableId && n.type === 'cable');
   if (!cableNode) {
@@ -176,24 +273,55 @@ function exportReviewReportPDF() {
     return;
   }
 
-  const lines = [
-    'PATH COORDINATION REVIEW REPORT',
-    `Generated: ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC`,
-    '',
+  const entries = [
+    { text: 'PATH COORDINATION REVIEW REPORT', bold: true, indent: 0 },
+    { text: `Generated: ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC`, indent: 0 },
+    { text: '', indent: 0 },
   ];
+
+  const warnColor = [0.82, 0.49, 0.16];
+  const errColor = [0.78, 0.24, 0.24];
+  const normalColor = [0.12, 0.13, 0.20];
 
   blocks.forEach((block, blockIndex) => {
     const title = block.querySelector('.review-title')?.textContent?.trim() || `Item ${blockIndex + 1}`;
-    lines.push(title);
+    entries.push({ text: title, bold: true, indent: 0, color: normalColor });
     const items = Array.from(block.querySelectorAll('li'));
     items.forEach((item) => {
       const text = item.textContent.replace(/\s+/g, ' ').trim();
-      if (text) lines.push(` - ${text}`);
+      if (!text) return;
+
+      const lower = text.toLowerCase();
+      const isWarn = item.classList.contains('review-warn');
+      const isErr = item.classList.contains('review-err');
+      const baseColor = isErr ? errColor : isWarn ? warnColor : normalColor;
+
+      let normalizedText = text;
+      if (isWarn && lower.includes('no breaker/fuse')) {
+        normalizedText = text.replace(/^[^\w]*/u, '[!] ');
+      }
+      normalizedText = normalizedText.replace(/×/g, 'x');
+
+      const cablePrefixMatch = normalizedText.match(/^([^\w]*)(CAB-[^:]*):\s*([^#\n]*?)\s*(#\S+)\s+/i);
+      if (cablePrefixMatch) {
+        const [, prefix, cableName, countText, wireSize] = cablePrefixMatch;
+        const count = parseInt(countText, 10);
+        if (Number.isFinite(count) && count > 1) {
+          normalizedText = normalizedText.replace(cablePrefixMatch[0], `${prefix}${cableName}: ${count} x ${wireSize} `);
+        }
+      }
+
+      const isCabLine = /^[^\w]*(OK|X|!|\[!\])?\s*CAB-/i.test(normalizedText);
+      entries.push({
+        text: `- ${normalizedText}`,
+        indent: isCabLine ? 2 : 1,
+        color: baseColor,
+      });
     });
-    lines.push('');
+    entries.push({ text: '', indent: 0 });
   });
 
-  const blob = createPdfBlobFromLines(lines);
+  const blob = createStyledPdfBlob(entries);
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'path_coordination_review_report.pdf';
