@@ -1872,8 +1872,11 @@ function buildPrintSvg(bounds) {
 function printCanvas() {
   const bounds = getDiagramBounds();
   const { imageDataUrl, width, height } = renderDiagramImageForPrint(bounds, 2);
-  const vectorSvgMarkup = buildPrintSvg(bounds);
-  const vectorSvgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(vectorSvgMarkup)}`;
+  const preferVectorPrint = canvasStyle !== 'engineering';
+  const vectorSvgMarkup = preferVectorPrint ? buildPrintSvg(bounds) : '';
+  const vectorSvgDataUrl = preferVectorPrint
+    ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(vectorSvgMarkup)}`
+    : '';
   const printFrame = document.createElement('iframe');
   printFrame.style.position = 'fixed';
   printFrame.style.right = '0';
@@ -1928,7 +1931,7 @@ function printCanvas() {
       </head>
       <body>
         <div class="sheet">
-          <img id="print-image" src="${vectorSvgDataUrl}" alt="Vector diagram export for printing" width="${width}" height="${height}">
+          <img id="print-image" src="${preferVectorPrint ? vectorSvgDataUrl : imageDataUrl}" alt="${preferVectorPrint ? 'Vector diagram export for printing' : 'Diagram export for printing'}" width="${width}" height="${height}">
         </div>
         <img id="fallback-image" src="${imageDataUrl}" alt="Raster diagram fallback for printing" width="${width}" height="${height}" style="display:none;">
       </body>
