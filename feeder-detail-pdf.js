@@ -98,6 +98,9 @@ function exportFeederDetailPDF(cableId) {
   const { from, to } = getCableEndpoints(cableNode);
   const metrics = calculateCableMetrics(cableNode);
   const system = p.system || '—';
+  const loadType = 'Continuous';
+  const loadFactor = 1.25; // Rule 8-104 continuous load basis.
+  const requiredAmpacity = metrics.I * loadFactor;
   const bonding = getBondingSelectionForCable(cableNode, {
     totalAmpacity: metrics.totalAmpacity,
     phaseConductorSize: p.size,
@@ -119,6 +122,7 @@ function exportFeederDetailPDF(cableId) {
     `Conductor Per Phase: ${metrics.conductorsPerPhase}`,
     `Conductor Size: ${p.size || '—'}`,
     `Insulation: ${p.insulation || '—'}`,
+    `Load Type: ${loadType}`,
     `Length of Cable Run: ${metrics.L.toFixed(2)} m`,
     `Voltage: ${metrics.V.toFixed(2)} V`,
     `System: ${system}`,
@@ -129,12 +133,30 @@ function exportFeederDetailPDF(cableId) {
     '',
     'Engineering Information',
     `${metrics.totalAmpacity.toFixed(2)} A   Ampacity of selected conductor set (${metrics.ampacityPerRun} A x ${metrics.conductorsPerPhase})`,
+    `${requiredAmpacity.toFixed(2)} A   Required ampacity for ${loadType.toLowerCase()} load (Rule 8-104, 125%)`,
     `${metrics.R.toFixed(6)} Ohms/m   Resistance (from rho/area approximation)`,
     `${metrics.vd.toFixed(3)} V   Calculated voltage drop`,
     `${metrics.maxAllowableVd.toFixed(3)} V   Maximum allowable voltage drop at 3%`,
     `${metrics.vdPct.toFixed(2)} %   Actual voltage drop percentage`,
     `${bonding.size}   Bonding conductor size (${bonding.ruleRef})`,
     `Bonding basis: ${bonding.basisDescription}`,
+    '',
+    'Code Basis',
+    'Rule 4-006: Temperature limitations',
+    'Rule 8-104: Load calculation (continuous/non-continuous)',
+    'Rule 12-108: Parallel conductors',
+    'Rule 10-616(3)(a): Bonding conductor sizing',
+    'Table 16: Bonding conductor size',
+    'Appendix D Table D3: Voltage drop calculation',
+    '',
+    'Engineering Assumptions',
+    'Assumptions:',
+    '- 75°C terminations',
+    '- No derating factors applied',
+    '- Ambient temperature: 30°C',
+    '- No harmonic loading',
+    '- Conductors installed in raceway',
+    '- Load type: continuous',
     '',
     disclaimer
   ];
