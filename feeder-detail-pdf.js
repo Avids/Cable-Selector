@@ -87,11 +87,12 @@ function createPdfBlobFromLines(lines) {
   return new Blob([pdf], { type: 'application/pdf' });
 }
 
-function createStyledPdfBlob(entries) {
+function createStyledPdfBlob(entries, options = {}) {
   const pageWidth = 612;
   const pageHeight = 792;
   const marginX = 48;
-  const topY = 770;
+  const topPadding = Number(options.topPadding) || 34;
+  const topY = pageHeight - topPadding - 22;
   const bottomMargin = 48;
   const lineHeight = 14;
 
@@ -321,7 +322,7 @@ function exportReviewReportPDF() {
     entries.push({ text: '', indent: 0 });
   });
 
-  const blob = createStyledPdfBlob(entries);
+  const blob = createStyledPdfBlob(entries, { topPadding: 44 });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'path_coordination_review_report.pdf';
@@ -329,6 +330,57 @@ function exportReviewReportPDF() {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+function exportFeederSchedulePDF() {
+  const cables = nodes.filter(n => n.type === 'cable');
+  if (cables.length === 0) {
+    alert('No cable components on the diagram yet.');
+    return;
+  }
+
+  const entries = [
+    { text: 'FEEDER / CABLE SCHEDULE REPORT', bold: true, indent: 0 },
+    { text: `Generated: ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC`, indent: 0 },
+    { text: '', indent: 0 },
+  ];
+
+  cables.forEach((cable) => {
+    const p = cable.props || {};
+    const { from, to } = getCableEndpoints(cable);
+    const V = Number(p.voltage) || 120;
+    const I = Number(p.amps) || 0;
+    const L = Number(p.length) || 1;
+    const mat = (p.material || 'Cu').toLowerCase().startsWith('al') ? 'AL' : 'CU';
+    const row = getCableRow(p.size);
+    const phases = getSystemPhaseCount(p.system, p.phases || ((p.conductors || 1) >= 3 ? 3 : 1));
+    const conductorCount = Math.max(1, parseInt(p.conductors, 10) || 1);
+    const rho = mat === 'AL' ? 0.0282 : 0.0172;
+    const R = rho / row.area;
+    const factor = phases === 3 ? Math.sqrt(3) : 2;
+    const vd = (factor * I * R * L) / conductorCount;
+    const vdPct = V > 0 ? (vd / V * 100) : 0;
+    const ampacityPerRun = mat === 'AL' ? row.al : row.cu;
+    const totalAmpacity = ampacityPerRun > 0 ? ampacityPerRun * conductorCount : 0;
+    const ampStatus = totalAmpacity <= 0 || I <= totalAmpacity ? 'OK' : 'OVER';
+    const vdStatus = vdPct > 5 ? 'FAIL' : vdPct > 3 ? 'CHECK' : 'OK';
+
+    entries.push({ text: p.name || `CAB-${cable.id}`, bold: true, indent: 0 });
+    entries.push({ text: `From: ${from}   To: ${to}`, indent: 1 });
+    entries.push({ text: `Conductor: ${conductorCount} x ${p.size || 'N/A'} ${mat}   Insulation: ${p.insulation || '—'}`, indent: 1 });
+    entries.push({ text: `Termination Temp: ${Number(p.termination_temp) || CABLE_TERMINATION_TEMP_C} C   Length: ${L} m`, indent: 1 });
+    entries.push({ text: `System: ${p.system || '—'}   Voltage/Phase: ${V} V / ${phases}O   Load: ${I} A`, indent: 1 });
+    entries.push({ text: `Ampacity: ${totalAmpacity > 0 ? `${totalAmpacity}A` : 'N/A'} (${ampStatus})   Voltage Drop: ${vd.toFixed(2)}V / ${vdPct.toFixed(2)}% (${vdStatus})`, indent: 1 });
+    entries.push({ text: '', indent: 0 });
+  });
+
+  const blob = createStyledPdfBlob(entries, { topPadding: 36 });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'feeder_schedule_report.pdf';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 window.exportReviewReportPDF = exportReviewReportPDF;
+window.exportFeederSchedulePDF = exportFeederSchedulePDF;
 
 window.exportFeederDetailPDF = exportFeederDetailPDF;
