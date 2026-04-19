@@ -1707,20 +1707,173 @@ function loadProject(e) {
   e.target.value = '';
 }
 
-function printCanvas() {
+function getDiagramBounds() {
+  if (nodes.length === 0) {
+    const viewWidth = canvas.width / zoom;
+    const viewHeight = canvas.height / zoom;
+    return {
+      minX: -pan.x / zoom,
+      minY: -pan.y / zoom,
+      maxX: -pan.x / zoom + viewWidth,
+      maxY: -pan.y / zoom + viewHeight,
+    };
+  }
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  const includePoint = (x, y) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  };
+
+  for (const n of nodes) {
+    const d = COMP_DEFS[n.type];
+    includePoint(n.x, n.y);
+    includePoint(n.x + d.w, n.y + d.h);
+    if (canvasStyle === 'engineering') {
+      includePoint(n.x + d.w + 180, n.y + d.h + 16);
+    }
+  }
+
+  for (const w of wires) {
+    const a = nodes.find(n => n.id === w.fromNode);
+    const b = nodes.find(n => n.id === w.toNode);
+    if (!a || !b) continue;
+    const pa = getPorts(a).find(p => p.id === w.fromPort);
+    const pb = getPorts(b).find(p => p.id === w.toPort);
+    if (!pa || !pb) continue;
+    const points = getWirePolylinePoints(pa, pb, w);
+    for (const point of points) includePoint(point.x, point.y);
+  }
+
+  const fallbackWidth = canvas.width / zoom;
+  const fallbackHeight = canvas.height / zoom;
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+    return {
+      minX: -pan.x / zoom,
+      minY: -pan.y / zoom,
+      maxX: -pan.x / zoom + fallbackWidth,
+      maxY: -pan.y / zoom + fallbackHeight,
+    };
+  }
+
+  return { minX, minY, maxX, maxY };
+}
+
+function renderDiagramImageForPrint(bounds, scale = 2) {
+  const margin = 40;
+  const worldWidth = Math.max(1, bounds.maxX - bounds.minX);
+  const worldHeight = Math.max(1, bounds.maxY - bounds.minY);
+  const exportWidth = Math.max(1, Math.ceil(worldWidth * scale + margin * 2));
+  const exportHeight = Math.max(1, Math.ceil(worldHeight * scale + margin * 2));
+
+  const prevState = {
+    width: canvas.width,
+    height: canvas.height,
+    panX: pan.x,
+    panY: pan.y,
+    zoom,
+    suppressCanvasBackdrop,
+  };
+
+  canvas.width = exportWidth;
+  canvas.height = exportHeight;
+  pan.x = margin - bounds.minX * scale;
+  pan.y = margin - bounds.minY * scale;
+  zoom = scale;
   suppressCanvasBackdrop = true;
   draw();
-  const exportCanvas = document.createElement('canvas');
-  exportCanvas.width = canvas.width;
-  exportCanvas.height = canvas.height;
-  const exportCtx = exportCanvas.getContext('2d');
-  exportCtx.fillStyle = '#ffffff';
-  exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-  exportCtx.drawImage(canvas, 0, 0);
-  suppressCanvasBackdrop = false;
+
+  const imageDataUrl = canvas.toDataURL('image/png');
+
+  canvas.width = prevState.width;
+  canvas.height = prevState.height;
+  pan.x = prevState.panX;
+  pan.y = prevState.panY;
+  zoom = prevState.zoom;
+  suppressCanvasBackdrop = prevState.suppressCanvasBackdrop;
   draw();
 
-  const imageDataUrl = exportCanvas.toDataURL('image/png');
+  return {
+    imageDataUrl,
+    width: exportWidth,
+    height: exportHeight,
+  };
+}
+
+function escapeForSvgText(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildPrintSvg(bounds) {
+  const margin = 40;
+  const width = Math.max(1, Math.ceil(bounds.maxX - bounds.minX + margin * 2));
+  const height = Math.max(1, Math.ceil(bounds.maxY - bounds.minY + margin * 2));
+  const offsetX = margin - bounds.minX;
+  const offsetY = margin - bounds.minY;
+  const wireStroke = canvasStyle === 'engineering' ? '#34495e' : '#3d4166';
+  const nodeStroke = canvasStyle === 'engineering' ? '#8a1111' : '#2e3155';
+  const nodeFill = canvasStyle === 'engineering' ? '#ffffff' : '#1e2030';
+
+  const wireSvg = wires.map(wire => {
+    const a = nodes.find(n => n.id === wire.fromNode);
+    const b = nodes.find(n => n.id === wire.toNode);
+    if (!a || !b) return '';
+    const pa = getPorts(a).find(p => p.id === wire.fromPort);
+    const pb = getPorts(b).find(p => p.id === wire.toPort);
+    if (!pa || !pb) return '';
+    const points = getWirePolylinePoints(pa, pb, wire);
+    const pointString = points
+      .map(point => `${(point.x + offsetX).toFixed(2)},${(point.y + offsetY).toFixed(2)}`)
+      .join(' ');
+    return `<polyline points="${pointString}" fill="none" stroke="${wireStroke}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />`;
+  }).join('\n');
+
+  const nodeSvg = nodes.map(n => {
+    const d = COMP_DEFS[n.type];
+    const name = escapeForSvgText(n.props.name || d.label);
+    const typeLabel = escapeForSvgText(d.label.toUpperCase());
+    const x = (n.x + offsetX).toFixed(2);
+    const y = (n.y + offsetY).toFixed(2);
+    const w = d.w.toFixed(2);
+    const h = d.h.toFixed(2);
+    const titleX = (n.x + d.w / 2 + offsetX).toFixed(2);
+    const typeY = (n.y + 15 + offsetY).toFixed(2);
+    const nameY = (n.y + d.h - 6 + offsetY).toFixed(2);
+    return `
+      <g>
+        <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" ry="6" fill="${nodeFill}" stroke="${nodeStroke}" stroke-width="1.2" />
+        <text x="${titleX}" y="${typeY}" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="9" fill="${nodeStroke}">${typeLabel}</text>
+        <text x="${titleX}" y="${nameY}" text-anchor="middle" font-family="'IBM Plex Sans', sans-serif" font-size="10" fill="${nodeStroke}">${name}</text>
+      </g>
+    `;
+  }).join('\n');
+
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff" />
+      ${wireSvg}
+      ${nodeSvg}
+    </svg>
+  `;
+}
+
+function printCanvas() {
+  const bounds = getDiagramBounds();
+  const { imageDataUrl, width, height } = renderDiagramImageForPrint(bounds, 2);
+  const vectorSvgMarkup = buildPrintSvg(bounds);
+  const vectorSvgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(vectorSvgMarkup)}`;
   const printFrame = document.createElement('iframe');
   printFrame.style.position = 'fixed';
   printFrame.style.right = '0';
@@ -1758,6 +1911,13 @@ function printCanvas() {
             align-items: center;
             justify-content: center;
           }
+          .sheet {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
           img {
             max-width: 100%;
             max-height: 100%;
@@ -1767,13 +1927,17 @@ function printCanvas() {
         </style>
       </head>
       <body>
-        <img id="print-image" src="${imageDataUrl}" alt="Canvas export for printing">
+        <div class="sheet">
+          <img id="print-image" src="${vectorSvgDataUrl}" alt="Vector diagram export for printing" width="${width}" height="${height}">
+        </div>
+        <img id="fallback-image" src="${imageDataUrl}" alt="Raster diagram fallback for printing" width="${width}" height="${height}" style="display:none;">
       </body>
     </html>
   `);
   printDoc.close();
 
   const printImage = printDoc.getElementById('print-image');
+  const fallbackImage = printDoc.getElementById('fallback-image');
   const triggerPrint = () => {
     const w = printFrame.contentWindow;
     if (!w) return;
@@ -1787,8 +1951,21 @@ function printCanvas() {
   if (printImage && !printImage.complete) {
     printImage.onload = triggerPrint;
     printImage.onerror = () => {
-      if (printFrame.parentNode) printFrame.parentNode.removeChild(printFrame);
-      alert('Failed to render canvas image for printing.');
+      if (printImage && fallbackImage) {
+        printImage.src = fallbackImage.src;
+        printImage.alt = 'Raster diagram export for printing';
+      }
+      if (printImage) {
+        if (!printImage.complete) {
+          printImage.onload = triggerPrint;
+          printImage.onerror = () => {
+            if (printFrame.parentNode) printFrame.parentNode.removeChild(printFrame);
+            alert('Failed to render printable diagram.');
+          };
+        } else {
+          triggerPrint();
+        }
+      }
     };
   } else {
     triggerPrint();
