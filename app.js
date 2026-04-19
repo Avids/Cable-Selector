@@ -1573,6 +1573,7 @@ function showFeederList() {
       <td>${p.conductors||1}C-${p.size} ${mat.toUpperCase()}</td>
       <td>${bonding.size}</td>
       <td>${p.insulation||'—'}</td>
+      <td>${Number(p.termination_temp) || CABLE_TERMINATION_TEMP_C}°C</td>
       <td>${L} m</td>
       <td>${system}</td>
       <td>${V} V / ${phases}Ø</td>
@@ -1586,7 +1587,7 @@ function showFeederList() {
   document.getElementById('feeder-content').innerHTML = `
     <table class="feeder-table">
       <thead><tr>
-        <th>Tag</th><th>From</th><th>To</th><th>CONDUCTOR PER PH</th><th>BONDING WIRE</th><th>Insulation</th>
+        <th>Tag</th><th>From</th><th>To</th><th>CONDUCTOR PER PH</th><th>BONDING WIRE</th><th>Insulation</th><th>Term. Temp</th>
         <th>Length</th><th>System</th><th>Voltage / Phase</th><th>Load</th>
         <th>Ampacity</th><th>Voltage Drop</th><th>Detail</th>
       </tr></thead>
@@ -1597,7 +1598,7 @@ function showFeederList() {
 
 function exportCSV() {
   const cables = nodes.filter(n => n.type === 'cable');
-  let csv = 'Tag,From,To,Conductors,Size,Material,Insulation,Length(m),System,Voltage(V),Phases,Load(A),Ampacity(A),VD(V),VD(%),Status\n';
+  let csv = 'Tag,From,To,Conductors,Size,Material,Insulation,TerminationTemp(C),Length(m),System,Voltage(V),Phases,Load(A),Ampacity(A),VD(V),VD(%),Status\n';
   for (const c of cables) {
     const p = c.props;
     const { from, to } = getCableEndpoints(c);
@@ -1619,7 +1620,7 @@ function exportCSV() {
     const totalAmpacity = ampacity > 0 ? ampacity * conductorsPerPhase : 0;
     const ampOk = totalAmpacity <= 0 || I <= totalAmpacity;
     const status = !ampOk ? 'OVERLOAD' : vd_pct > 5 ? 'VD_FAIL' : vd_pct > 3 ? 'VD_CHECK' : 'PASS';
-    csv += `${p.name||''},${from},${to},${p.conductors||1},${p.size},${mat.toUpperCase()},${p.insulation||''},${L},${system},${V},${phases},${I},${totalAmpacity>0?totalAmpacity:'N/A'},${vd.toFixed(3)},${vd_pct.toFixed(2)},${status}\n`;
+    csv += `${p.name||''},${from},${to},${p.conductors||1},${p.size},${mat.toUpperCase()},${p.insulation||''},${Number(p.termination_temp) || CABLE_TERMINATION_TEMP_C},${L},${system},${V},${phases},${I},${totalAmpacity>0?totalAmpacity:'N/A'},${vd.toFixed(3)},${vd_pct.toFixed(2)},${status}\n`;
   }
   const a = document.createElement('a');
   a.href = 'data:text/csv,' + encodeURIComponent(csv);

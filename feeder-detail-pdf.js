@@ -163,4 +163,44 @@ function exportFeederDetailPDF(cableId) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+function exportReviewReportPDF() {
+  const reviewContent = document.getElementById('review-content');
+  if (!reviewContent) {
+    alert('Review content is unavailable.');
+    return;
+  }
+
+  const blocks = Array.from(reviewContent.querySelectorAll('.review-block'));
+  if (blocks.length === 0) {
+    alert('Run Review first to generate report content.');
+    return;
+  }
+
+  const lines = [
+    'PATH COORDINATION REVIEW REPORT',
+    `Generated: ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC`,
+    '',
+  ];
+
+  blocks.forEach((block, blockIndex) => {
+    const title = block.querySelector('.review-title')?.textContent?.trim() || `Item ${blockIndex + 1}`;
+    lines.push(title);
+    const items = Array.from(block.querySelectorAll('li'));
+    items.forEach((item) => {
+      const text = item.textContent.replace(/\s+/g, ' ').trim();
+      if (text) lines.push(` - ${text}`);
+    });
+    lines.push('');
+  });
+
+  const blob = createPdfBlobFromLines(lines);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'path_coordination_review_report.pdf';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+window.exportReviewReportPDF = exportReviewReportPDF;
+
 window.exportFeederDetailPDF = exportFeederDetailPDF;
