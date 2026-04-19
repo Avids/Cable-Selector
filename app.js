@@ -99,23 +99,23 @@ const SYSTEM_CONFIG = {
 };
 
 const COMP_DEFS = {
-  utility:     { w:80,  h:80,  label:'Utility',      color:'#89b4fa', titleColor:'#89b4fa',
+  utility:     { w:68,  h:68,  label:'Utility',      color:'#89b4fa', titleColor:'#89b4fa',
                  defaults:{name:'UTIL-1', voltage:600, phases:3, fault_kA:25} },
-  transformer: { w:80,  h:90,  label:'Transformer',  color:'#cba6f7', titleColor:'#cba6f7',
+  transformer: { w:70,  h:80,  label:'Transformer',  color:'#cba6f7', titleColor:'#cba6f7',
                  defaults:{name:'TX-1', spec:'STEP-DOWN', kva:75, primary_v:600, secondary_v:208, phases:3, impedance:4.5, conn:'Delta-Wye'} },
-  panel:       { w:90,  h:80,  label:'Panel',        color:'#94e2d5', titleColor:'#94e2d5',
+  panel:       { w:76,  h:68,  label:'Panel',        color:'#94e2d5', titleColor:'#94e2d5',
                  defaults:{name:'MDP', voltage:120, system:'3ph/4w', main_amps:200, short_ckt_kA:10, mfr:'Square D'} },
-  breaker:     { w:60,  h:80,  label:'Breaker',      color:'#74c7ec', titleColor:'#74c7ec',
+  breaker:     { w:52,  h:72,  label:'Breaker',      color:'#74c7ec', titleColor:'#74c7ec',
                  defaults:{name:'CB-1', amps:20, voltage:120, system:'1ph/2w', kaic:10, mfr:'Square D'} },
-  fuse:        { w:60,  h:80,  label:'Fuse Disc.',   color:'#fab387', titleColor:'#fab387',
+  fuse:        { w:52,  h:72,  label:'Fuse Disc.',   color:'#fab387', titleColor:'#fab387',
                  defaults:{name:'FD-1', amps:30, voltage:600, phases:3, fuse_class:'RK5', poles:3} },
-  bus:         { w:110, h:50,  label:'Bus Bar',      color:'#f9e2af', titleColor:'#f9e2af',
+  bus:         { w:90, h:44,  label:'Bus Bar',      color:'#f9e2af', titleColor:'#f9e2af',
                  defaults:{name:'BUS-1', voltage:120, amps:400, phases:3} },
-  cable:       { w:90,  h:60,  label:'Cable',        color:'#a6e3a1', titleColor:'#a6e3a1',
+  cable:       { w:78,  h:54,  label:'Cable',        color:'#a6e3a1', titleColor:'#a6e3a1',
                  defaults:{name:'CAB-1', conductors:1, size:'#12', insulation:'RW90', length:10, material:'Cu', amps:20, voltage:120, system:'3ph/4w', bonding_scope:'Feeder/Branch', bonding_method:'Overcurrent Device', ocpd_amps:20, bonding_material:'Cu'} },
-  load:        { w:60,  h:80,  label:'Load',         color:'#f38ba8', titleColor:'#f38ba8',
+  load:        { w:54,  h:72,  label:'Load',         color:'#f38ba8', titleColor:'#f38ba8',
                  defaults:{name:'LOAD-1', current:20, voltage:120, phases:1} },
-  meter:       { w:70,  h:70,  label:'Meter',        color:'#b4befe', titleColor:'#b4befe',
+  meter:       { w:58,  h:58,  label:'Meter',        color:'#b4befe', titleColor:'#b4befe',
                  defaults:{name:'MTR-1', type:'kWh', ct_ratio:'200:5', voltage:120} },
 };
 
@@ -174,9 +174,11 @@ let hoverPortInfo = null;
 let canvasStyle = 'engineering';
 let suppressCanvasBackdrop = false;
 let wireRouting = 'orthogonal';
+const GRID_SNAP = 5;
 const PROJECT_FILE_EXTENSION = 'edsld';
 const DEFAULT_PROJECT_NAME = 'untitled';
 let projectName = DEFAULT_PROJECT_NAME;
+let activeWireHandleDrag = null;
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -322,7 +324,7 @@ function draw() {
     const pa = getPorts(a).find(p => p.id === w.fromPort);
     const pb = getPorts(b).find(p => p.id === w.toPort);
     if (!pa || !pb) continue;
-    drawWire(pa, pb, w === selected);
+    drawWire(pa, pb, w === selected, w);
   }
 
   // Ghost wire
@@ -379,11 +381,11 @@ function draw() {
   ctx.restore();
 }
 
-function drawWire(pa, pb, selected) {
-  const points = getWirePolylinePoints(pa, pb);
+function drawWire(pa, pb, selected, wire = null) {
+  const points = getWirePolylinePoints(pa, pb, wire);
   ctx.beginPath();
-  const defaultWire = canvasStyle === 'engineering' ? '#8a1111' : '#3d4166';
-  const selectedWire = canvasStyle === 'engineering' ? '#c22a2a' : '#89b4fa';
+  const defaultWire = canvasStyle === 'engineering' ? '#34495e' : '#3d4166';
+  const selectedWire = canvasStyle === 'engineering' ? '#1f6fb2' : '#89b4fa';
   ctx.strokeStyle = selected ? selectedWire : defaultWire;
   ctx.lineWidth = (selected ? 2 : 1.5) / zoom;
   ctx.moveTo(points[0].x, points[0].y);
@@ -393,17 +395,40 @@ function drawWire(pa, pb, selected) {
   ctx.stroke();
 
   // Junction dots
-  ctx.fillStyle = selected ? selectedWire : (canvasStyle === 'engineering' ? '#8a1111' : '#6c7086');
+  ctx.fillStyle = selected ? selectedWire : (canvasStyle === 'engineering' ? '#34495e' : '#6c7086');
   ctx.beginPath(); ctx.arc(pa.x, pa.y, 3/zoom, 0, Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.arc(pb.x, pb.y, 3/zoom, 0, Math.PI*2); ctx.fill();
+
+  if (selected && wireRouting === 'orthogonal') {
+    const hp = { x: points[1].x, y: points[1].y + (points[2].y - points[1].y) / 2 };
+    ctx.beginPath();
+    ctx.fillStyle = selectedWire;
+    ctx.arc(hp.x, hp.y, 4.5 / zoom, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
-function getWirePolylinePoints(pa, pb) {
+function getWirePolylinePoints(pa, pb, wire = null) {
   if (wireRouting === 'straight') {
     return [pa, pb];
   }
-  const mx = pa.x + (pb.x - pa.x) / 2;
+  const bendOffset = Number.isFinite(wire?.bendOffset) ? wire.bendOffset : 0;
+  const mx = pa.x + (pb.x - pa.x) / 2 + bendOffset;
   return [pa, { x: mx, y: pa.y }, { x: mx, y: pb.y }, pb];
+}
+
+function hitWireHandle(wx, wy) {
+  if (!selected || !wires.includes(selected) || wireRouting !== 'orthogonal') return false;
+  const a = nodes.find(n => n.id === selected.fromNode);
+  const b = nodes.find(n => n.id === selected.toNode);
+  if (!a || !b) return false;
+  const pa = getPorts(a).find(p => p.id === selected.fromPort);
+  const pb = getPorts(b).find(p => p.id === selected.toPort);
+  if (!pa || !pb) return false;
+  const points = getWirePolylinePoints(pa, pb, selected);
+  const handleX = points[1].x;
+  const handleY = points[1].y + (points[2].y - points[1].y) / 2;
+  return Math.hypot(wx - handleX, wy - handleY) <= 8 / zoom;
 }
 
 function drawNode(n, isSel, isHov) {
@@ -636,8 +661,8 @@ function dropComp(e) {
   const node = {
     id: idCounter++,
     type: type,
-    x: Math.round((x - d.w/2) / 10) * 10,
-    y: Math.round((y - d.h/2) / 10) * 10,
+    x: Math.round((x - d.w/2) / GRID_SNAP) * GRID_SNAP,
+    y: Math.round((y - d.h/2) / GRID_SNAP) * GRID_SNAP,
     props: Object.assign({}, d.defaults),
   };
   if (node.props.system) {
@@ -666,6 +691,10 @@ canvas.addEventListener('mousedown', e => {
   }
 
   if (mode === 'select') {
+    if (hitWireHandle(x, y)) {
+      activeWireHandleDrag = { startX: x, startOffset: selected?.bendOffset || 0 };
+      return;
+    }
     const n = hitNode(x, y);
     if (n) {
       if (!selectedNodes.has(n) || selectedNodes.size <= 1) {
@@ -729,10 +758,17 @@ canvas.addEventListener('mousemove', e => {
     const dx = x - dragSelection.start.x;
     const dy = y - dragSelection.start.y;
     for (const item of dragSelection.nodes) {
-      item.node.x = Math.round((item.x + dx) / 10) * 10;
-      item.node.y = Math.round((item.y + dy) / 10) * 10;
+      item.node.x = Math.round((item.x + dx) / GRID_SNAP) * GRID_SNAP;
+      item.node.y = Math.round((item.y + dy) / GRID_SNAP) * GRID_SNAP;
     }
     draw(); return;
+  }
+
+  if (mode === 'select' && activeWireHandleDrag && selected && wires.includes(selected)) {
+    const offset = activeWireHandleDrag.startOffset + (x - activeWireHandleDrag.startX);
+    selected.bendOffset = Math.round(offset / GRID_SNAP) * GRID_SNAP;
+    draw();
+    return;
   }
 
   if (mode === 'connect') {
@@ -774,6 +810,11 @@ canvas.addEventListener('mouseup', e => {
     syncCableVoltages();
     dragSelection = null;
     dragNode = null;
+    return;
+  }
+
+  if (activeWireHandleDrag) {
+    activeWireHandleDrag = null;
     return;
   }
 
@@ -823,7 +864,7 @@ function wireHitTest(w, wx, wy) {
   const pa = getPorts(a).find(p => p.id === w.fromPort);
   const pb = getPorts(b).find(p => p.id === w.toPort);
   if (!pa || !pb) return false;
-  const points = getWirePolylinePoints(pa, pb);
+  const points = getWirePolylinePoints(pa, pb, w);
   for (let i = 0; i < points.length - 1; i++) {
     if (distancePointToSegment(wx, wy, points[i], points[i + 1]) < 8 / zoom) {
       return true;
@@ -920,7 +961,7 @@ function showWireProps(w) {
   document.getElementById('props-type-badge').style.display = 'inline';
   document.getElementById('props-type-badge').textContent = 'CONNECTOR'; // Changed from WIRE
   document.getElementById('prop-content').innerHTML =
-    `<div class="props-empty" style="color:var(--text2)">Connector connection selected.<br><small style="color:var(--text3)">Press Delete to remove.</small></div>`;
+    `<div class="props-empty" style="color:var(--text2)">Connector selected.<br><small style="color:var(--text3)">Drag the blue midpoint handle to tune routing. Press Delete to remove.</small></div>`;
   document.getElementById('calc-panel').classList.remove('visible');
 }
 
@@ -1074,9 +1115,9 @@ function alignAllComponents() {
 
   rows.forEach((row, rowIndex) => {
     row.nodes.sort((a, b) => a.x - b.x);
-    const alignedY = Math.round((minY + rowIndex * spacingY) / 10) * 10;
+    const alignedY = Math.round((minY + rowIndex * spacingY) / GRID_SNAP) * GRID_SNAP;
     row.nodes.forEach((node, colIndex) => {
-      node.x = Math.round((minX + colIndex * spacingX) / 10) * 10;
+      node.x = Math.round((minX + colIndex * spacingX) / GRID_SNAP) * GRID_SNAP;
       node.y = alignedY;
     });
   });

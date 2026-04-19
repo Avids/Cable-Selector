@@ -49,12 +49,7 @@
   <div class="sep"></div>
   <button class="tb-btn" onclick="saveProject()">↓ Save</button>
   <button class="tb-btn" onclick="document.getElementById('file-input').click()">↑ Load</button>
-  <button class="tb-btn" onclick="printCanvas()">🖨 Print Canvas</button>
   <input type="file" id="file-input" accept=".edsld" style="display:none" onchange="loadProject(event)">
-  <div class="sep"></div>
-  <button class="tb-btn review" onclick="reviewCoordination()">✓ Review Coordination</button>
-  <button class="tb-btn success" onclick="showFeederList()">≡ Feeder Schedule</button>
-  <button class="tb-btn" onclick="showRulesHelp()">ℹ Rules Help</button>
   <div id="project-name">PROJECT: UNTITLED</div>
   <div id="status-bar">MODE: SELECT</div>
 </div>
@@ -168,6 +163,12 @@
     ondragover="event.preventDefault()"
     ondrop="dropComp(event)">
     <canvas id="canvas"></canvas>
+    <div id="canvas-actions">
+      <button class="tb-btn" onclick="printCanvas()">🖨 Print Canvas</button>
+      <button class="tb-btn review" onclick="reviewCoordination()">✓ Review</button>
+      <button class="tb-btn success" onclick="showFeederList()">≡ Feeders</button>
+      <button class="tb-btn" onclick="showRulesHelp()">ℹ Rules</button>
+    </div>
   </div>
 
   <!-- PROPERTIES PANEL -->

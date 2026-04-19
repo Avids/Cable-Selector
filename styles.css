@@ -20,7 +20,7 @@
     --teal: #94e2d5;
     --font: 'IBM Plex Sans', sans-serif;
     --mono: 'IBM Plex Mono', monospace;
-    --grid: 20px;
+    --grid: 10px;
     --sidebar-w: 180px;
     --props-w: 240px;
     --topbar-h: 48px;
@@ -40,6 +40,9 @@
     gap: 6px;
     flex-shrink: 0;
     z-index: 10;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
   }
   #topbar .logo {
     font-family: var(--mono);
@@ -169,6 +172,19 @@
   #canvas-wrap.engineering {
     background: #e9e9e9;
     background-image: none;
+  }
+  #canvas-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 6;
+  }
+  #canvas-actions .tb-btn {
+    background: rgba(22,24,33,0.95);
+    backdrop-filter: blur(2px);
   }
   #canvas {
     position: absolute;
@@ -447,4 +463,31 @@
     color: var(--text3);
     display: flex;
     align-items: center;
+  }
+
+  @media (max-width: 1220px) {
+    :root {
+      --sidebar-w: 160px;
+      --props-w: 210px;
+    }
+    .tb-btn { padding: 5px 8px; font-size: 11px; }
+    #project-name { display: none; }
+    #zoom-controls { right: 12px; }
+  }
+
+  @media (max-width: 980px) {
+    #workspace {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      grid-template-rows: 1fr 190px;
+    }
+    #sidebar { grid-column: 1; grid-row: 1 / span 2; }
+    #canvas-wrap { grid-column: 2; grid-row: 1; min-height: 300px; }
+    #props-panel {
+      grid-column: 2;
+      grid-row: 2;
+      width: 100%;
+      border-left: none;
+      border-top: 1px solid var(--border);
+    }
   }
