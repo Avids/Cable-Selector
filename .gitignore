@@ -1,5 +1,3 @@
---- .gitignore (原始)
-```gitignore
 # Compiled and build artifacts
 *.pyc
 __pycache__/
