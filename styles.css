@@ -179,6 +179,19 @@
     background: #ffffff;
     background-image: none;
   }
+  #canvas-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 6;
+  }
+  #canvas-actions .tb-btn {
+    background: rgba(22,24,33,0.95);
+    backdrop-filter: blur(2px);
+  }
   #canvas {
     position: absolute;
     top: 0; left: 0;
@@ -475,4 +488,31 @@
     display: flex;
     align-items: center;
     font-weight: 500;
+  }
+
+  @media (max-width: 1220px) {
+    :root {
+      --sidebar-w: 160px;
+      --props-w: 210px;
+    }
+    .tb-btn { padding: 5px 8px; font-size: 11px; }
+    #project-name { display: none; }
+    #zoom-controls { right: 12px; }
+  }
+
+  @media (max-width: 980px) {
+    #workspace {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      grid-template-rows: 1fr 190px;
+    }
+    #sidebar { grid-column: 1; grid-row: 1 / span 2; }
+    #canvas-wrap { grid-column: 2; grid-row: 1; min-height: 300px; }
+    #props-panel {
+      grid-column: 2;
+      grid-row: 2;
+      width: 100%;
+      border-left: none;
+      border-top: 1px solid var(--border);
+    }
   }
